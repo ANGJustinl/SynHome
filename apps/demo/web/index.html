@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Control</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: system, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* 命令输入区域 */
+        .command-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .example-commands {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        /* 设备展示区域 */
+        .devices-container {
+            display: flex;
+            margin-top: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .device-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+        }
+        
+        .device-icon {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            background: #ecf5ff;
+            border-radius: 8px;
+        }
+        
+        .device-info {
+            flex: 1;
+        }
+        
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .device-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #303133;
+        }
+        
+        .device-property {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .property-name {
+            color: #606266;
+        }
+        
+        .property-value {
+            color: #409eff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="command-section">
+                <h2>智能家居控制</h2>
+                <el-input
+                    v-model="commandInput"
+                    placeholder="输入控制命令，或点击下方示例"
+                    size="large"
+                    @keyup.enter="sendCommand"
+                >
+                    <template #append>
+                        <el-button @click="sendCommand" type="primary">发送</el-button>
+                    </template>
+                </el-input>
+                
+                <div class="example-commands">
+                    <el-tag 
+                        v-for="cmd in deviceCommands"
+                        :key="cmd.text"
+                        :type="cmd.type"
+                        style="cursor: pointer"
+                        @click="useCommand(cmd.text)"
+                    >
+                        {{ cmd.text }}
+                    </el-tag>
+                </div>
+            </div>
+
+            <div class="devices-container">
+                <!-- 动态渲染所有设备 -->
+                <div v-for="device in devices" :key="device.id" class="device-section">
+                    <div class="device-icon">{{ getDeviceIcon(device.type) }}</div>
+                    <div class="device-info">
+                        <div class="device-header">
+                            <span class="device-name">{{ device.name }}</span>
+                            <el-tag :type="getStateType(device.state)" size="small">
+                                {{ getStateText(device.state) }}
+                            </el-tag>
+                        </div>
+                        <div class="device-properties">
+                            <!-- 动态渲染设备的属性 -->
+                            <div class="device-property" v-for="(capInfo, capName) in device.capabilities" :key="capName">
+                                <span class="property-name">{{ getCapabilityLabel(capName) }}</span>
+                                <span class="property-value">
+                                    {{ formatCapabilityValue(capName, capInfo) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue
+
+        const app = createApp({
+            setup() {
+                const devices = ref([])
+                const commandInput = ref('')
+                const deviceTypes = ref({})
+                const capabilityLabels = ref({})
+                const enumValueLabels = ref({})
+
+                // 默认设备命令示例
+                const defaultCommands = [
+                    { text: "打开空调", type: "" },
+                    { text: "把温度调高一点", type: "" },
+                    { text: "风速调到中档", type: "" },
+                    { text: "把灯光调暗一点", type: "success" },
+                    { text: "开启阅读场景模式", type: "success" },
+                    { text: "开始煮饭", type: "warning" },
+                    { text: "选择煲仔饭程序", type: "warning" },
+                    { text: "打开厨房插座", type: "info" },
+                    { text: "设置插座定时2小时", type: "info" },
+                    { text: "开启扫地机器人", type: "primary" },
+                    { text: "将吸力设为强劲", type: "primary" },
+                    { text: "把窗帘拉到一半", type: "danger" },
+                    { text: "打开窗帘", type: "danger" }
+                ]
+
+                // 动态命令列表，会根据设备更新
+                const deviceCommands = ref(defaultCommands)
+                
+                // 默认图标映射 - 会在运行时扩展
+                const deviceIconMap = {
+                    'thermostat': '❄️',
+                    'light': '💡',
+                    'rice_cooker': '🍚',
+                    'socket': '🔌',
+                    'vacuum': '🧹',
+                    'curtain': '🪟',
+                    'fan': '💨',
+                    'tv': '📺',
+                    'speaker': '🔊',
+                    'humidifier': '💦',
+                    'air_purifier': '🌬️',
+                    'default': '📱'
+                }
+                
+                // 默认能力标签 - 会在运行时扩展
+                const defaultCapLabels = {
+                    'power': '电源',
+                    'temperature': '温度',
+                    'mode': '模式',
+                    'fan_speed': '风速',
+                    'brightness': '亮度',
+                    'color': '颜色',
+                    'scene': '场景',
+                    'program': '程序',
+                    'keep_warm': '保温',
+                    'timer': '定时',
+                    'suction': '吸力',
+                    'battery': '电量',
+                    'position': '位置',
+                    'volume': '音量'
+                }
+                
+                // 加载设备并初始化UI配置
+                const fetchDevices = async () => {
+                    try {
+                        const response = await axios.get('/devices')
+                        devices.value = response.data
+                        
+                        // 根据设备动态构建UI配置
+                        updateUIConfig()
+                    } catch (error) {
+                        console.error('Failed to fetch devices:', error)
+                    }
+                }
+                
+                // 更新UI配置以适应当前设备
+                const updateUIConfig = () => {
+                    // 收集所有设备类型和枚举值
+                    const deviceTypesSet = new Set()
+                    const capabilityValues = {}
+                    
+                    // 初始化能力标签
+                    capabilityLabels.value = {...defaultCapLabels}
+                    
+                    devices.value.forEach(device => {
+                        // 收集设备类型
+                        deviceTypesSet.add(device.type)
+                        
+                        // 收集每种枚举类型的值
+                        for (const [capName, capInfo] of Object.entries(device.capabilities)) {
+                            // 如果是枚举类型，收集其值
+                            if (capInfo.type === 'enum' && capInfo.values) {
+                                if (!capabilityValues[capName]) {
+                                    capabilityValues[capName] = new Set()
+                                }
+                                capInfo.values.forEach(value => {
+                                    capabilityValues[capName].add(value)
+                                })
+                            }
+                            
+                            // 如果还没有此能力的标签，用名称作为标签
+                            if (!capabilityLabels.value[capName]) {
+                                // 将蛇形命名转换为可读形式
+                                capabilityLabels.value[capName] = capName
+                                    .replace(/_/g, ' ')
+                                    .replace(/\b\w/g, l => l.toUpperCase())
+                            }
+                        }
+                    })
+                    
+                    // 转换为数组
+                    deviceTypes.value = Array.from(deviceTypesSet)
+                    
+                    // 构建枚举值标签映射
+                    const valueLabels = {}
+                    for (const [capName, valueSet] of Object.entries(capabilityValues)) {
+                        valueLabels[capName] = {}
+                        valueSet.forEach(value => {
+                            // 尝试为值生成人类可读的标签
+                            valueLabels[capName][value] = 
+                                getDefaultValueLabel(capName, value)
+                        })
+                    }
+                    enumValueLabels.value = valueLabels
+                    
+                    // 根据当前设备更新示例命令
+                    updateExampleCommands()
+                }
+                
+                // 为枚举值生成默认标签
+                const getDefaultValueLabel = (capName, value) => {
+                    // 预定义一些常见值的中文名
+                    const commonLabels = {
+                        // 模式
+                        'auto': '自动',
+                        'cool': '制冷',
+                        'heat': '制热',
+                        'fan': '送风',
+                        'sleep': '睡眠',
+                        'normal': '普通',
+                        'energy_saving': '节能',
+                        'protection': '保护',
+                        'spot': '定点清扫',
+                        'edge': '沿边清扫',
+                        'zigzag': '曲线清扫',
+                        'manual': '手动',
+                        'schedule': '定时',
+                        
+                        // 颜色
+                        'white': '白光',
+                        'warm': '暖光',
+                        'natural': '自然光',
+                        'cool': '冷光',
+                        
+                        // 场景
+                        'reading': '阅读',
+                        'movie': '观影',
+                        'relax': '休闲',
+                        
+                        // 程序
+                        'quick': '快速煮饭',
+                        'claypot_rice': '煲仔饭',
+                        'porridge': '煮粥',
+                        'soup': '煲汤',
+                        
+                        // 吸力
+                        'low': '低',
+                        'medium': '中',
+                        'high': '高',
+                        'turbo': '强劲'
+                    }
+                    
+                    return commonLabels[value] || value
+                }
+                
+                // 根据当前设备更新示例命令
+                const updateExampleCommands = () => {
+                    const commands = [...defaultCommands]
+                    
+                    // 根据设备类型添加特定命令
+                    devices.value.forEach(device => {
+                        // 可以根据设备类型添加特定命令
+                        switch (device.type) {
+                            // 可以根据需要添加特定设备的命令
+                        }
+                    })
+                    
+                    deviceCommands.value = commands
+                }
+
+                const getDeviceByType = (type) => {
+                    return devices.value.find(d => d.type.toLowerCase().includes(type))
+                }
+
+                const sendCommand = async () => {
+                    if (!commandInput.value.trim()) return
+                    
+                    try {
+                        // 尝试使用全局命令
+                        await axios.post(`/command`, {
+                            command: commandInput.value
+                        })
+                        ElementPlus.ElMessage.success('命令已发送')
+                        commandInput.value = ''
+                        await fetchDevices()
+                    } catch (error) {
+                        ElementPlus.ElMessage.error(error.response?.data?.detail || '命令发送失败')
+                    }
+                }
+
+                const useCommand = (cmd) => {
+                    commandInput.value = cmd
+                    sendCommand()
+                }
+
+                const getDeviceIcon = (type) => {
+                    return deviceIconMap[type] || deviceIconMap['default']
+                }
+
+                const getCapabilityLabel = (name) => {
+                    return capabilityLabels.value[name] || name
+                }
+
+                const formatCapabilityValue = (name, info) => {
+                    const value = info.current_value
+
+                    // 为不同类型的属性格式化值
+                    if (info.type === 'switch') {
+                        return value === 'on' ? '开启' : '关闭'
+                    } else if (info.type === 'number') {
+                        return `${value}${info.unit || ''}`
+                    } else if (info.type === 'enum') {
+                        // 使用动态枚举值标签
+                        const valueLabels = enumValueLabels.value[name]
+                        return valueLabels && valueLabels[value] ? valueLabels[value] : value
+                    }
+                    return value
+                }
+
+                // 文本转换函数
+                const getStateType = (state) => {
+                    const types = {
+                        'IDLE': 'info',
+                        'ON': 'success',
+                        'OFF': 'danger',
+                        'RUNNING': 'primary'
+                    }
+                    return types[state] || 'info'
+                }
+
+                const getStateText = (state) => {
+                    const texts = {
+                        'IDLE': '待机',
+                        'ON': '开启',
+                        'OFF': '关闭',
+                        'RUNNING': '运行中'
+                    }
+                    return texts[state] || state
+                }
+
+                // 初始化
+                fetchDevices()
+                setInterval(fetchDevices, 5000)
+
+                return {
+                    devices,
+                    commandInput,
+                    deviceCommands,
+                    getDeviceByType,
+                    sendCommand,
+                    useCommand,
+                    getDeviceIcon,
+                    getCapabilityLabel,
+                    formatCapabilityValue,
+                    getStateType,
+                    getStateText
+                }
+            }
+        })
+
+        app.use(ElementPlus)
+        app.mount('#app')
+    </script>
+</body>
+</html>

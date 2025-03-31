@@ -1,0 +1,173 @@
+# Demo configuration file
+
+# ZhipuAI API settings
+zhipuai:
+  enabled: true
+  api_key: "key.key"  # Demo API key
+
+# Device configurations
+devices:
+  - id: "thermostat1"
+    name: "客厅空调"
+    type: "thermostat"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - temperature:
+          type: "number"
+          min: 16
+          max: 30
+          unit: "°C"
+          current_value: 24
+      - mode:
+          type: "enum"
+          values: ["auto", "cool", "heat", "fan"]
+          current_value: "auto"
+      - fan_speed: 
+          type: "enum"
+          values: ["low", "medium", "high"]
+          current_value: "medium"
+  
+  - id: "light1"
+    name: "客厅灯"
+    type: "light"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - brightness:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"
+          current_value: 100
+      - color:
+          type: "enum"
+          values: ["white", "warm", "natural", "cool"]
+          current_value: "white"
+      - scene:
+          type: "enum"
+          values: ["normal", "reading", "movie", "relax"]
+          current_value: "normal"
+  
+  - id: "cooker1"
+    name: "厨房电饭煲"
+    type: "rice_cooker"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - program:
+          type: "enum"
+          values: ["normal", "quick", "claypot_rice", "porridge", "soup"]
+          current_value: "normal"
+      - keep_warm:
+          type: "switch"
+          states: ["off", "on"]
+          current_value: "off"
+
+  # 新设备 - 智能插座
+  - id: "socket1"
+    name: "厨房插座"
+    type: "socket"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - timer:
+          type: "number"
+          min: 0
+          max: 86400  # 24小时（秒）
+          unit: "秒"
+          current_value: 0
+      - mode:
+          type: "enum"
+          values: ["normal", "energy_saving", "protection"]
+          current_value: "normal"
+  
+  # 新设备 - 扫地机器人
+  - id: "vacuum1"
+    name: "客厅扫地机"
+    type: "vacuum"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - mode:
+          type: "enum"
+          values: ["auto", "spot", "edge", "zigzag"]
+          current_value: "auto"
+      - suction:
+          type: "enum"
+          values: ["low", "medium", "high", "turbo"]
+          current_value: "medium"
+      - battery:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"
+          current_value: 85
+
+  # 新设备 - 智能窗帘
+  - id: "curtain1"
+    name: "客厅窗帘"
+    type: "curtain"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - position:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"
+          current_value: 100
+      - mode:
+          type: "enum"
+          values: ["manual", "auto", "schedule"]
+          current_value: "manual"
+
+# Device group configurations
+device_groups:
+  - id: "living_room"
+    name: "客厅设备组"
+    devices: ["thermostat1", "light1", "curtain1", "vacuum1"]
+  
+  - id: "kitchen"
+    name: "厨房设备组"
+    devices: ["cooker1", "socket1"]
+
+# Scene configurations
+scenes:
+  - id: "movie_mode"
+    name: "观影模式"
+    actions:
+      - device_id: "light1"
+        command: "multi_control"
+        params:
+          power: "on"
+          brightness: 30
+          scene: "movie"
+      - device_id: "curtain1" 
+        command: "multi_control"
+        params:
+          power: "on"
+          position: 0
+      - device_id: "thermostat1"
+        command: "multi_control"
+        params:
+          power: "on"
+          temperature: 24
+          mode: "auto"
+  
+  - id: "away_mode"
+    name: "离家模式"
+    actions:
+      - device_id: "ALL"  # Special target for all devices
+        command: "off"
+
+# Log settings
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

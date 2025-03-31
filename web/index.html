@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Control</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: system, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* 命令输入区域 */
+        .command-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .example-commands {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        /* 设备展示区域 */
+        .devices-container {
+            display: flex;
+            margin-top: 20px;
+            gap: 20px;
+        }
+        
+        .device-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+        }
+        
+        .device-icon {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            background: #ecf5ff;
+            border-radius: 8px;
+        }
+        
+        .device-info {
+            flex: 1;
+        }
+        
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .device-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #303133;
+        }
+        
+        .device-property {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .property-name {
+            color: #606266;
+        }
+        
+        .property-value {
+            color: #409eff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="command-section">
+                <h2>智能家居控制</h2>
+                <el-input
+                    v-model="commandInput"
+                    placeholder="输入控制命令，或点击下方示例"
+                    size="large"
+                    @keyup.enter="sendCommand"
+                >
+                    <template #append>
+                        <el-button @click="sendCommand" type="primary">发送</el-button>
+                    </template>
+                </el-input>
+                
+                <div class="example-commands">
+                    <el-tag 
+                        v-for="cmd in deviceCommands"
+                        :key="cmd.text"
+                        :type="cmd.type"
+                        style="cursor: pointer"
+                        @click="useCommand(cmd.text)"
+                    >
+                        {{ cmd.text }}
+                    </el-tag>
+                </div>
+            </div>
+
+            <div class="devices-container">
+                <!-- 空调 -->
+                <div v-if="getDeviceByType('thermostat')" class="device-section">
+                    <div class="device-icon">❄️</div>
+                    <div class="device-info">
+                        <div class="device-header">
+                            <span class="device-name">{{ getDeviceByType('thermostat').name }}</span>
+                            <el-tag :type="getStateType(getDeviceByType('thermostat').state)" size="small">
+                                {{ getStateText(getDeviceByType('thermostat').state) }}
+                            </el-tag>
+                        </div>
+                        <div class="device-properties">
+                            <div class="device-property">
+                                <span class="property-name">当前温度</span>
+                                <span class="property-value">
+                                    {{ getDeviceByType('thermostat').attributes.current_temperature }}°C
+                                </span>
+                            </div>
+                            <div class="device-property">
+                                <span class="property-name">目标温度</span>
+                                <span class="property-value">
+                                    {{ getDeviceByType('thermostat').attributes.target_temperature }}°C
+                                </span>
+                            </div>
+                            <div class="device-property">
+                                <span class="property-name">模式</span>
+                                <span class="property-value">
+                                    {{ getModeText(getDeviceByType('thermostat').attributes.mode) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 灯光 -->
+                <div v-if="getDeviceByType('light')" class="device-section">
+                    <div class="device-icon">💡</div>
+                    <div class="device-info">
+                        <div class="device-header">
+                            <span class="device-name">{{ getDeviceByType('light').name }}</span>
+                            <el-tag :type="getStateType(getDeviceByType('light').state)" size="small">
+                                {{ getStateText(getDeviceByType('light').state) }}
+                            </el-tag>
+                        </div>
+                        <div class="device-properties">
+                            <div class="device-property">
+                                <span class="property-name">亮度</span>
+                                <span class="property-value">
+                                    {{ getDeviceByType('light').attributes.brightness }}%
+                                </span>
+                            </div>
+                            <div class="device-property">
+                                <span class="property-name">颜色</span>
+                                <span class="property-value">
+                                    {{ getColorText(getDeviceByType('light').attributes.color) }}
+                                </span>
+                            </div>
+                            <div class="device-property">
+                                <span class="property-name">场景</span>
+                                <span class="property-value">
+                                    {{ getSceneText(getDeviceByType('light').attributes.scene) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 电饭煲 -->
+                <div v-if="getDeviceByType('rice_cooker')" class="device-section">
+                    <div class="device-icon">🍚</div>
+                    <div class="device-info">
+                        <div class="device-header">
+                            <span class="device-name">{{ getDeviceByType('rice_cooker').name }}</span>
+                            <el-tag :type="getStateType(getDeviceByType('rice_cooker').state)" size="small">
+                                {{ getStateText(getDeviceByType('rice_cooker').state) }}
+                            </el-tag>
+                        </div>
+                        <div class="device-properties">
+                            <div class="device-property">
+                                <span class="property-name">程序</span>
+                                <span class="property-value">
+                                    {{ getProgramText(getDeviceByType('rice_cooker').attributes.program) }}
+                                </span>
+                            </div>
+                            <div class="device-property">
+                                <span class="property-name">保温</span>
+                                <span class="property-value">
+                                    {{ getDeviceByType('rice_cooker').attributes.keep_warm ? '开启' : '关闭' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+
+        const app = createApp({
+            setup() {
+                const devices = ref([])
+                const commandInput = ref('')
+
+                // 示例命令配置
+                const deviceCommands = [
+                    { text: "把温度调高一点", type: "" },
+                    { text: "设置成制冷模式，风速调到中档", type: "" },
+                    { text: "把灯光调暗一点", type: "success" },
+                    { text: "开启阅读场景模式", type: "success" },
+                    { text: "开始煮饭", type: "warning" },
+                    { text: "选择煲仔饭程序", type: "warning" }
+                ]
+
+                const fetchDevices = async () => {
+                    try {
+                        const response = await axios.get('/devices')
+                        devices.value = response.data
+                    } catch (error) {
+                        console.error('Failed to fetch devices:', error)
+                    }
+                }
+
+                const getDeviceByType = (type) => {
+                    return devices.value.find(d => d.type.toLowerCase().includes(type))
+                }
+
+                const sendCommand = async () => {
+                    if (!commandInput.value.trim()) return
+                    
+                    try {
+                        // 直接发送命令到后端API，由智谱AI进行处理
+                        await axios.post('/command', {
+                            command: commandInput.value
+                        })
+                        
+                        ElementPlus.ElMessage.success('命令已发送')
+                        commandInput.value = ''
+                        await fetchDevices() // 刷新设备状态
+                    } catch (error) {
+                        const errorMessage = error.response?.data?.message || '命令发送失败'
+                        ElementPlus.ElMessage.error(errorMessage)
+                    }
+                }
+
+                const useCommand = (cmd) => {
+                    commandInput.value = cmd
+                    sendCommand()
+                }
+
+                // 文本转换函数
+                const getStateType = (state) => {
+                    const types = {
+                        'IDLE': 'info',
+                        'ON': 'success',
+                        'OFF': 'danger',
+                        'RUNNING': 'primary'
+                    }
+                    return types[state] || 'info'
+                }
+
+                const getStateText = (state) => {
+                    const texts = {
+                        'IDLE': '待机',
+                        'ON': '开启',
+                        'OFF': '关闭',
+                        'RUNNING': '运行中'
+                    }
+                    return texts[state] || state
+                }
+
+                const getModeText = (mode) => {
+                    const texts = {
+                        'auto': '自动',
+                        'cool': '制冷',
+                        'heat': '制热',
+                        'fan': '送风'
+                    }
+                    return texts[mode] || mode
+                }
+
+                const getColorText = (color) => {
+                    const texts = {
+                        'white': '白光',
+                        'warm': '暖光',
+                        'natural': '自然光'
+                    }
+                    return texts[color] || color
+                }
+
+                const getSceneText = (scene) => {
+                    const texts = {
+                        'normal': '普通',
+                        'reading': '阅读',
+                        'movie': '观影',
+                        'relax': '休闲'
+                    }
+                    return texts[scene] || scene
+                }
+
+                const getProgramText = (program) => {
+                    const texts = {
+                        'normal': '标准煮饭',
+                        'quick': '快速煮饭',
+                        'porridge': '煮粥',
+                        'soup': '煲汤'
+                    }
+                    return texts[program] || program
+                }
+
+                // 初始化
+                fetchDevices()
+                setInterval(fetchDevices, 5000)
+
+                return {
+                    devices,
+                    commandInput,
+                    deviceCommands,
+                    getDeviceByType,
+                    sendCommand,
+                    useCommand,
+                    getStateType,
+                    getStateText,
+                    getModeText,
+                    getColorText,
+                    getSceneText,
+                    getProgramText
+                }
+            }
+        })
+
+        app.use(ElementPlus)
+        app.mount('#app')
+    </script>
+</body>
+</html>
