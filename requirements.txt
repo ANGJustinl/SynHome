@@ -4,7 +4,7 @@ uvicorn==0.27.0
 
 # Data Handling
 pydantic==2.6.0
-python-multipart==0.0.9
+python-multipart==0.0.20
 pyyaml==6.0.1
 
 # Templates and Static Files
