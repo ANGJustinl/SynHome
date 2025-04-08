@@ -43,6 +43,10 @@ class SmartDevice:
         self.state = DeviceState.IDLE
         self.llm_client: Optional[ZhipuAIClient] = None
         
+        # 新增：物理设备关联字段
+        self.adapter_id = None  # 关联的适配器ID
+        self.physical_device_id = None  # 物理设备ID
+        
         # Load capabilities from config
         for cap_dict in config["capabilities"]:
             for cap_name, cap_config in cap_dict.items():
@@ -134,6 +138,50 @@ class SmartDevice:
             logger.error(f"Error setting capability {name}: {str(e)}")
             return False
     
+    def update_capability_from_physical(self, name: str, value: Any) -> bool:
+        """
+        从物理设备更新能力状态，不触发物理设备通信
+        
+        Args:
+            name: 能力名称
+            value: 新状态值
+            
+        Returns:
+            是否更新成功
+        """
+        if name not in self.capabilities:
+            logger.error(f"Capability {name} not found")
+            return False
+                
+        cap = self.capabilities[name]
+        
+        try:
+            # 预处理值，去除单位后缀
+            value = self._sanitize_value(name, value)
+            
+            if cap.type == CapabilityType.SWITCH:
+                if value not in cap.states:
+                    raise ValueError(f"Invalid state {value} for {name}")
+                cap.current_value = value
+                self.state = DeviceState.ON if value == "on" else DeviceState.OFF
+                
+            elif cap.type == CapabilityType.NUMBER:
+                num_value = float(value)
+                if not (cap.min_value <= num_value <= cap.max_value):
+                    raise ValueError(f"Value {value} out of range for {name}")
+                cap.current_value = num_value
+                
+            elif cap.type == CapabilityType.ENUM:
+                if value not in cap.values:
+                    raise ValueError(f"Invalid value {value} for {name}")
+                cap.current_value = value
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating capability {name} from physical device: {str(e)}")
+            return False
+
     def _sanitize_value(self, capability_name: str, value: Any) -> Any:
         """处理参数值，去除单位后缀并转换为适当的类型"""
         if not isinstance(value, str):

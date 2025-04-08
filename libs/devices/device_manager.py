@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional
 from .smart_device import SmartDevice, Capability, CapabilityType
 from ..utils.llm import ZhipuAIClient
 from ..utils.command_parser import CommandParser
+from ..adapters import get_adapter_class, DeviceAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class DeviceManager:
         """Initialize device manager"""
         self.devices: Dict[str, SmartDevice] = {}
         self.llm_client: Optional[ZhipuAIClient] = None
+        self.adapters: Dict[str, DeviceAdapter] = {}  # 设备适配器
         
     def load_devices_from_config(self, devices_config: List[Dict[str, Any]]):
         """
@@ -413,3 +415,127 @@ If unsure, respond with the most likely device type."""
         except Exception as e:
             logger.error(f"Error determining device type: {str(e)}")
             return None
+    
+    async def load_adapters_from_config(self, adapters_config: List[Dict[str, Any]]):
+        """
+        从配置加载设备适配器
+        
+        Args:
+            adapters_config: 适配器配置列表
+        """
+        for adapter_config in adapters_config:
+            try:
+                adapter_id = adapter_config["id"]
+                adapter_type = adapter_config["type"]
+                adapter_class = get_adapter_class(adapter_type)
+                
+                if not adapter_class:
+                    logger.error(f"Unsupported adapter type: {adapter_type}")
+                    continue
+                    
+                # 创建适配器实例
+                adapter = adapter_class(adapter_id, adapter_config["config"])
+                self.adapters[adapter_id] = adapter
+                
+                # 注册状态回调
+                adapter.register_status_callback(self._on_device_status_update)
+                
+                # 连接适配器
+                connected = await adapter.connect()
+                if connected:
+                    logger.info(f"Connected adapter: {adapter_id} ({adapter_type})")
+                    
+                    # 发现设备
+                    devices = await adapter.discover_devices()
+                    logger.info(f"Discovered {len(devices)} devices from adapter {adapter_id}")
+                    
+                else:
+                    logger.error(f"Failed to connect adapter: {adapter_id}")
+                
+            except Exception as e:
+                logger.error(f"Error loading adapter {adapter_config.get('id', 'unknown')}: {str(e)}", exc_info=True)
+    
+    def _on_device_status_update(self, device_id: str, status: Dict[str, Any]):
+        """
+        处理来自适配器的设备状态更新
+        
+        Args:
+            device_id: 设备ID
+            status: 设备状态
+        """
+        # 查找对应的智能设备
+        device = self.get_device_by_id(device_id)
+        if not device:
+            logger.warning(f"Received status update for unknown device: {device_id}")
+            return
+            
+        # 更新设备能力状态
+        for cap_name, cap_value in status.items():
+            if cap_name in device.capabilities:
+                device.set_capability(cap_name, cap_value)
+                logger.debug(f"Updated device {device_id} capability {cap_name} to {cap_value}")
+    
+    async def send_command_to_physical_device(self, device_id: str, command: Dict[str, Any]) -> bool:
+        """
+        发送命令到物理设备
+        
+        Args:
+            device_id: 设备ID
+            command: 命令数据
+            
+        Returns:
+            命令是否成功发送
+        """
+        # 查找设备对应的适配器
+        device = self.get_device_by_id(device_id)
+        if not device or not hasattr(device, 'adapter_id'):
+            logger.error(f"Device {device_id} not found or not associated with adapter")
+            return False
+            
+        adapter_id = device.adapter_id
+        adapter = self.adapters.get(adapter_id)
+        if not adapter:
+            logger.error(f"Adapter {adapter_id} not found")
+            return False
+            
+        # 发送命令
+        return await adapter.send_command(device_id, command)
+    
+    async def associate_physical_devices(self, physical_devices_config: List[Dict[str, Any]]):
+        """
+        将物理设备与虚拟设备模型关联
+        
+        Args:
+            physical_devices_config: 物理设备配置列表
+        """
+        for device_config in physical_devices_config:
+            try:
+                # 获取必要的信息
+                device_id = device_config.get("id")
+                adapter_id = device_config.get("adapter_id")
+                physical_id = device_config.get("device_id")
+                
+                if not all([device_id, adapter_id, physical_id]):
+                    logger.error(f"Missing required physical device configuration: {device_config}")
+                    continue
+                    
+                # 获取虚拟设备和适配器
+                virtual_device = self.get_device_by_id(device_id)
+                adapter = self.adapters.get(adapter_id)
+                
+                if not virtual_device:
+                    logger.error(f"Virtual device not found: {device_id}")
+                    continue
+                    
+                if not adapter:
+                    logger.error(f"Adapter not found: {adapter_id}")
+                    continue
+                    
+                # 为虚拟设备添加适配器信息
+                virtual_device.adapter_id = adapter_id
+                virtual_device.physical_device_id = physical_id
+                
+                logger.info(f"Associated device {device_id} with physical device {physical_id} via adapter {adapter_id}")
+                
+            except Exception as e:
+                logger.error(f"Error associating physical device: {str(e)}")
