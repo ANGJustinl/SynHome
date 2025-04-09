@@ -61,5 +61,52 @@ def test_compound_commands():
     except Exception as e:
         logger.error(f"测试出错: {str(e)}", exc_info=True)
 
+async def test_physical_devices():
+    """测试物理设备控制功能"""
+    
+    # 加载配置
+    try:
+        config = ConfigLoader("config/demo.yaml").load()
+        api_key = config["zhipuai"]["api_key"]
+        
+        # 创建设备管理器
+        device_manager = DeviceManager()
+        
+        # 加载设备
+        device_manager.load_devices_from_config(config["devices"])
+        device_manager.enable_llm_control(api_key)
+        
+        # 初始化物理设备适配器
+        if "adapters" in config:
+            await device_manager.load_adapters_from_config(config["adapters"])
+            print(f"Loaded {len(device_manager.adapters)} adapters")
+            
+            # 关联物理设备
+            if "physical_devices" in config:
+                await device_manager.associate_physical_devices(config["physical_devices"])
+                print("Associated physical devices")
+        
+        # 测试与物理设备交互
+        # 找到一个有适配器关联的设备
+        for device in device_manager.get_all_devices():
+            if hasattr(device, 'adapter_id') and device.adapter_id:
+                print(f"Testing physical device: {device.name}")
+                
+                # 发送命令到物理设备
+                command = {"command": "set_power", "params": {"power": "on"}}
+                result = await device_manager.send_command_to_physical_device(device.id, command)
+                print(f"Command result: {result}")
+                break
+                
+        # 测试完成后断开连接
+        for adapter_id, adapter in device_manager.adapters.items():
+            await adapter.disconnect()
+            print(f"Disconnected adapter: {adapter_id}")
+                
+    except Exception as e:
+        print(f"Test error: {str(e)}")
+
+# 运行异步测试
 if __name__ == "__main__":
-    test_compound_commands()
+    import asyncio
+    asyncio.run(test_physical_devices())

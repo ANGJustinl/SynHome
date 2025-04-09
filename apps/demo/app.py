@@ -240,6 +240,33 @@ async def get_device_info():
         logger.error(f"Error getting device info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # 加载和初始化所有适配器
+        if "adapters" in config:
+            await device_manager.load_adapters_from_config(config["adapters"])
+            logger.info(f"Initialized {len(device_manager.adapters)} device adapters")
+            
+            # 将物理设备与虚拟设备关联
+            if "physical_devices" in config:
+                await device_manager.associate_physical_devices(config["physical_devices"])
+                logger.info("Associated physical devices with virtual models")
+    except Exception as e:
+        logger.error(f"Error initializing adapters: {str(e)}", exc_info=True)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    try:
+        # 断开所有适配器连接
+        if hasattr(device_manager, "adapters"):
+            for adapter_id, adapter in device_manager.adapters.items():
+                logger.info(f"Disconnecting adapter: {adapter_id}")
+                await adapter.disconnect()
+            logger.info("All adapters disconnected")
+    except Exception as e:
+        logger.error(f"Error disconnecting adapters: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
