@@ -1,25 +1,25 @@
 """
-Configuration models for SynHome using Pydantic v2.
+Simplified SynHome Configuration using Pydantic v2
 
-These models provide type-safe configuration management with validation,
-environment variable support, and clear error messages.
+Modern, type-safe configuration management with minimal complexity.
 """
 
-from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field, field_validator
+from pydantic_settings import BaseSettings
+from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
 
 class Environment(str, Enum):
-    """Application environment types."""
+    """Application environment."""
     DEVELOPMENT = "development"
-    TESTING = "testing"
     PRODUCTION = "production"
+    TESTING = "testing"
 
 
 class LogLevel(str, Enum):
-    """Log levels matching Python logging."""
+    """Log levels."""
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -27,183 +27,99 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class LogConfig(BaseModel):
-    """Logging configuration model."""
+class LoggingConfig(BaseModel):
+    """Logging configuration."""
     level: LogLevel = LogLevel.INFO
-    format: str = Field(
-        default="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
-        description="Log message format string"
-    )
-    file_path: Optional[str] = Field(
-        default=None,
-        description="Path to log file (if logging to file)"
-    )
-    max_size: str = Field(
-        default="100 MB",
-        description="Maximum log file size before rotation"
-    )
-    retention: str = Field(
-        default="30 days",
-        description="How long to keep log files"
-    )
-    compression: str = Field(
-        default="zip",
-        description="Compression format for rotated logs"
-    )
-    rotation: str = Field(
-        default="1 day",
-        description="Log file rotation schedule"
-    )
-    serialize: bool = Field(
-        default=False,
-        description="Whether to serialize logs as JSON"
-    )
-    enqueue: bool = Field(
-        default=True,
-        description="Whether to use async log writing"
-    )
-    console_output: Optional[bool] = Field(
-        default=None,
-        description="Whether to output logs to console"
-    )
-
-    @field_validator('level')
-    @classmethod
-    def validate_log_level(cls, v):
-        return LogLevel(v.upper())
+    format: str = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"
+    file_path: Optional[str] = "logs/app.log"
+    max_file_size: str = "10 MB"
+    backup_count: int = 5
+    console_output: bool = True
 
 
 class ZhipuAIConfig(BaseModel):
-    """ZhipuAI LLM configuration model."""
-    enabled: bool = Field(
-        default=False,
-        description="Whether ZhipuAI LLM integration is enabled"
-    )
-    api_key: str = Field(
-        description="ZhipuAI API key",
-        min_length=10
-    )
-    model: str = Field(
-        default="chatglm-turbo",
-        description="ZhipuAI model to use"
-    )
-    timeout: int = Field(
-        default=30,
-        ge=1,
-        le=300,
-        description="Request timeout in seconds"
-    )
-    max_retries: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Maximum number of retry attempts"
-    )
-    temperature: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=2.0,
-        description="Temperature parameter for generation"
-    )
+    """ZhipuAI LLM configuration."""
+    enabled: bool = False
+    api_key: Optional[str] = None
+    model: str = "chatglm-turbo"
+    base_url: str = "https://open.bigmodel.cn/api/paas/v4"
 
     @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v):
-        if not v or len(v) < 10:
-            raise ValueError('API key must be at least 10 characters long')
+    def validate_api_key(cls, v, info):
+        if info.data.get('enabled') and not v:
+            raise ValueError("API key is required when ZhipuAI is enabled")
         return v
 
 
-class HotReloadConfig(BaseModel):
-    """Hot reload configuration model."""
-    enabled: bool = Field(
-        default=True,
-        description="Whether hot reload is enabled"
-    )
-    watch_files: List[str] = Field(
-        default_factory=lambda: ["*.yaml", "*.yml", "*.json"],
-        description="File patterns to watch for changes"
-    )
-    debounce_seconds: float = Field(
-        default=1.0,
-        ge=0.1,
-        le=10.0,
-        description="Debounce time for file changes in seconds"
-    )
-    reloadable_sections: List[str] = Field(
-        default_factory=lambda: ["logging", "zhipuai", "device_groups", "scenes"],
-        description="Configuration sections that can be hot reloaded"
-    )
+class DeviceConfig(BaseModel):
+    """Device configuration matching original format."""
+    id: str
+    name: str
+    type: str
+    capabilities: Dict[str, Dict[str, Any]]  # Original expects dict, not list
 
 
 class AppSettings(BaseSettings):
-    """Main application settings with environment variable support."""
-    model_config = SettingsConfigDict(
-        env_prefix="SYNHOME_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        env_nested_delimiter="__",
-        case_sensitive=False,
-        extra="forbid"
-    )
+    """Main application settings using Pydantic v2 BaseSettings."""
 
-    # Core settings
+    # Core application settings
     environment: Environment = Environment.DEVELOPMENT
     debug: bool = False
     host: str = "0.0.0.0"
-    port: int = Field(default=8000, ge=1, le=65535)
+    port: int = 8000
 
-    # Logging
-    logging: LogConfig = LogConfig()
+    # Logging configuration
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
-    # LLM Integration
-    zhipuai: Optional[ZhipuAIConfig] = None
+    # External integrations
+    zhipuai: ZhipuAIConfig = Field(default_factory=ZhipuAIConfig)
 
-    # Hot Reload
-    hot_reload: HotReloadConfig = HotReloadConfig()
+    # Device configuration
+    devices: List[DeviceConfig] = Field(default_factory=list)
 
-    # Feature Flags
-    features: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="Feature flags for enabling/disabling functionality"
-    )
+    # Additional fields from original config
+    adapters: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    physical_devices: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
-    # Additional configuration (loaded from YAML)
-    devices_file: Optional[str] = Field(
-        default="config/demo.yaml",
-        description="Path to devices configuration file"
-    )
+    # Additional settings
+    app_name: str = "SynHome"
+    version: str = "1.0.0"
 
-    # Security
-    secret_key: Optional[str] = Field(
-        default=None,
-        description="Secret key for session management"
-    )
+    class Config:
+        """Pydantic v2 configuration."""
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        env_nested_delimiter = "__"
+        case_sensitive = False
+        extra = "allow"  # Allow extra fields to match original flexibility
 
-    @field_validator('port')
-    @classmethod
-    def validate_port(cls, v):
-        if v < 1 or v > 65535:
-            raise ValueError('Port must be between 1 and 65535')
+    @field_validator('debug')
+    def set_debug_from_environment(cls, v, info):
+        """Automatically enable debug in development environment."""
+        if info.data.get('environment') == Environment.DEVELOPMENT:
+            return True
         return v
 
-    def get_log_file_path(self) -> str:
-        """Get the effective log file path, handling None values."""
-        if self.logging.file_path:
-            return self.logging.file_path
+    @field_validator('port')
+    def validate_port(cls, v):
+        """Validate port number."""
+        if not 1 <= v <= 65535:
+            raise ValueError("Port must be between 1 and 65535")
+        return v
 
-        # Default log file paths by environment
-        env_defaults = {
-            Environment.PRODUCTION: "/var/log/synhome/app.log",
-            Environment.TESTING: "logs/test.log",
-            Environment.DEVELOPMENT: "logs/app.log"
+    def get_log_config(self) -> Dict[str, Any]:
+        """Get logging configuration dictionary."""
+        return {
+            "level": self.logging.level.value,
+            "format": self.logging.format,
+            "file_path": self.logging.file_path,
+            "console_output": self.logging.console_output,
         }
-        return env_defaults.get(self.environment, "logs/app.log")
-
-    def is_development(self) -> bool:
-        """Check if running in development mode."""
-        return self.environment == Environment.DEVELOPMENT
 
     def is_production(self) -> bool:
         """Check if running in production mode."""
         return self.environment == Environment.PRODUCTION
+
+    def is_development(self) -> bool:
+        """Check if running in development mode."""
+        return self.environment == Environment.DEVELOPMENT

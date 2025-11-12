@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from loguru import logger
 
 from .models import AppSettings, LogConfig, ZhipuAIConfig, HotReloadConfig
-from .devices import DeviceConfig, AdapterConfig, SmartHomeConfig
 
 
 @dataclass

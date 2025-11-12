@@ -1,0 +1,8 @@
+2025-11-12 23:50:17 | INFO     | libs.logging.setup:setup_logging:55 | Logging system initialized
+2025-11-12 23:50:17 | INFO     | apps.demo.app:lifespan:57 | SynHome starting - Environment: development
+2025-11-12 23:50:17 | INFO     | apps.demo.app:lifespan:58 | Server will be available at http://0.0.0.0:8000
+2025-11-12 23:51:40 | INFO     | apps.demo.app:lifespan:73 | SynHome stopped
+2025-11-12 23:54:35 | INFO     | libs.logging.setup:setup_logging:55 | Logging system initialized
+2025-11-12 23:54:35 | INFO     | apps.demo.app:lifespan:57 | SynHome starting - Environment: development
+2025-11-12 23:54:35 | INFO     | apps.demo.app:lifespan:58 | Server will be available at http://0.0.0.0:8000
+2025-11-12 23:55:25 | INFO     | apps.demo.app:lifespan:73 | SynHome stopped

@@ -1,201 +1,81 @@
-# Demo configuration file
+# Demo configuration file for SynHome
 
 # ZhipuAI API settings
 zhipuai:
   enabled: true
-  api_key: "key.key"  # Demo API key
+  api_key: "your_api_key_here"  # Replace with actual API key
+  model: "chatglm-turbo"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
 
 # Device configurations
 devices:
   - id: "thermostat1"
     name: "客厅空调"
-    type: "thermostat"
+    type: "air_conditioner"
     capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - temperature:
-          type: "number"
-          min: 16
-          max: 30
-          unit: "°C"
-          current_value: 24
-      - mode:
-          type: "enum"
-          values: ["auto", "cool", "heat", "fan"]
-          current_value: "auto"
-      - fan_speed: 
-          type: "enum"
-          values: ["low", "medium", "high"]
-          current_value: "medium"
-  
+      power:
+        type: "switch"
+        states: ["on", "off"]
+      temperature:
+        type: "number"
+        unit: "celsius"
+        min_value: 16
+        max_value: 30
+      mode:
+        type: "enum"
+        values: ["cool", "heat", "auto", "fan"]
+
   - id: "light1"
-    name: "客厅灯"
+    name: "客厅主灯"
     type: "light"
     capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - brightness:
-          type: "number"
-          min: 0
-          max: 100
-          unit: "%"
-          current_value: 100
-      - color:
-          type: "enum"
-          values: ["white", "warm", "natural", "cool"]
-          current_value: "white"
-      - scene:
-          type: "enum"
-          values: ["normal", "reading", "movie", "relax"]
-          current_value: "normal"
-  
-  - id: "cooker1"
-    name: "厨房电饭煲"
-    type: "rice_cooker"
-    capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - program:
-          type: "enum"
-          values: ["normal", "quick", "claypot_rice", "porridge", "soup"]
-          current_value: "normal"
-      - keep_warm:
-          type: "switch"
-          states: ["off", "on"]
-          current_value: "off"
+      power:
+        type: "switch"
+        states: ["on", "off"]
+      brightness:
+        type: "number"
+        unit: "percent"
+        min_value: 0
+        max_value: 100
+      color:
+        type: "enum"
+        values: ["white", "warm", "cool", "red", "green", "blue"]
 
-  # 新设备 - 智能插座
-  - id: "socket1"
-    name: "厨房插座"
-    type: "socket"
-    capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - timer:
-          type: "number"
-          min: 0
-          max: 86400  # 24小时（秒）
-          unit: "秒"
-          current_value: 0
-      - mode:
-          type: "enum"
-          values: ["normal", "energy_saving", "protection"]
-          current_value: "normal"
-  
-  # 新设备 - 扫地机器人
-  - id: "vacuum1"
-    name: "客厅扫地机"
-    type: "vacuum"
-    capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - mode:
-          type: "enum"
-          values: ["auto", "spot", "edge", "zigzag"]
-          current_value: "auto"
-      - suction:
-          type: "enum"
-          values: ["low", "medium", "high", "turbo"]
-          current_value: "medium"
-      - battery:
-          type: "number"
-          min: 0
-          max: 100
-          unit: "%"
-          current_value: 85
-
-  # 新设备 - 智能窗帘
   - id: "curtain1"
     name: "客厅窗帘"
     type: "curtain"
     capabilities:
-      - power:
-          type: "switch"
-          states: ["off", "on"]
-      - position:
-          type: "number"
-          min: 0
-          max: 100
-          unit: "%"
-          current_value: 100
-      - mode:
-          type: "enum"
-          values: ["manual", "auto", "schedule"]
-          current_value: "manual"
+      position:
+        type: "number"
+        unit: "percent"
+        min_value: 0
+        max_value: 100
+      mode:
+        type: "enum"
+        values: ["manual", "automatic"]
 
-# 适配器配置
+# Adapter configurations
 adapters:
-  - id: "ws_adapter"
-    type: "websocket"
-    config:
-      url: "ws://192.168.1.100:8080/ws"
-      use_ssl: false
-      timeout: 10
-      # ...其他配置...
-
-  - id: "mqtt_adapter"
+  mqtt_adapter:
     type: "mqtt"
-    config:
-      mqtt:
-        host: "192.168.1.101"
-        port: 1883
-        # ...其他配置...
+    host: "localhost"
+    port: 1883
+    username: ""
+    password: ""
 
-# 物理设备配置
+  http_adapter:
+    type: "http"
+    base_url: "http://localhost:8080"
+    timeout: 30
+
+# Physical device mappings
 physical_devices:
-  - id: "physical_light1"
-    name: "物理客厅灯"
-    type: "light"
-    adapter_id: "ws_adapter"  # 关联的适配器ID
-    device_id: "light123"     # 物理设备在适配器中的ID
-    capabilities:
-      # ...能力配置...
+  "mqtt:living_room_ac":
+    virtual_device: "thermostat1"
+    adapter: "mqtt_adapter"
+    topic: "home/living_room/ac"
 
-# Device group configurations
-device_groups:
-  - id: "living_room"
-    name: "客厅设备组"
-    devices: ["thermostat1", "light1", "curtain1", "vacuum1"]
-  
-  - id: "kitchen"
-    name: "厨房设备组"
-    devices: ["cooker1", "socket1"]
-
-# Scene configurations
-scenes:
-  - id: "movie_mode"
-    name: "观影模式"
-    actions:
-      - device_id: "light1"
-        command: "multi_control"
-        params:
-          power: "on"
-          brightness: 30
-          scene: "movie"
-      - device_id: "curtain1" 
-        command: "multi_control"
-        params:
-          power: "on"
-          position: 0
-      - device_id: "thermostat1"
-        command: "multi_control"
-        params:
-          power: "on"
-          temperature: 24
-          mode: "auto"
-  
-  - id: "away_mode"
-    name: "离家模式"
-    actions:
-      - device_id: "ALL"  # Special target for all devices
-        command: "off"
-
-# Log settings
-logging:
-  level: INFO
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  "http:living_room_light":
+    virtual_device: "light1"
+    adapter: "http_adapter"
+    endpoint: "/api/lights/living_room"

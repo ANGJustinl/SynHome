@@ -1,60 +1,50 @@
 """
-Loguru setup utilities for SynHome.
+Simplified Loguru setup for SynHome.
 
-Provides simple logging configuration.
+Clean logging configuration without complex formatters.
 """
 
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 from loguru import logger
 
 
 def setup_logging(
-    log_config: Optional[Dict[str, Any]] = None,
     console_output: bool = True,
     file_path: Optional[str] = None,
     log_level: str = "INFO"
 ) -> None:
     """
-    Setup Loguru logging.
+    Setup Loguru logging with simple configuration.
 
     Args:
-        log_config: Logging configuration dictionary
-        console_output: Whether to enable console output
+        console_output: Whether to output to console
         file_path: Optional log file path
-        log_level: Log level
+        log_level: Logging level
     """
-    # Remove all existing handlers
+    # Remove default handler
     logger.remove()
 
-    # Setup console handler
+    log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"
+
+    # Console handler
     if console_output:
-        console_format = (
-            "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | "
-            "{name}:{function}:{line} | {message}"
-        )
         logger.add(
             sys.stderr,
-            format=console_format,
+            format=log_format,
             level=log_level,
-            colorize=True,
-            backtrace=True,
-            diagnose=True
+            colorize=True
         )
 
-    # Setup file handler
+    # File handler
     if file_path:
         log_path = Path(file_path)
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        file_format = (
-            "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | "
-            "{name}:{function}:{line} | {message}"
-        )
         logger.add(
             log_path,
-            format=file_format,
+            format=log_format,
             level=log_level,
             rotation="10 MB",
             retention="30 days",
@@ -65,9 +55,9 @@ def setup_logging(
     logger.info("Logging system initialized")
 
 
-def get_logger(name: str = "synhome") -> "logger":
+def get_logger(name: str):
     """
-    Get a logger instance with the specified name.
+    Get a logger instance with the given name.
 
     Args:
         name: Logger name

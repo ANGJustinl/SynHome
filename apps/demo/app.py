@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-FastAPI backend for device control demo with enhanced configuration validation
+FastAPI backend for device control demo
 """
 
-import sys
+import logging
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from contextlib import asynccontextmanager
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.parent
@@ -22,100 +22,19 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 
-# Import simplified configuration system
 from libs.config import load_config, AppSettings
-from libs.logging import setup_logging, get_logger
 from libs.devices.device_manager import DeviceManager
 from apps.demo.debug_middleware import DebugMiddleware
 
-# Global variables for configuration and services
-app_settings: Optional[AppSettings] = None
-device_manager: Optional[DeviceManager] = None
-logger = None
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Simple application lifespan for SynHome."""
-    global app_settings, device_manager, logger
-
-    try:
-        # Load configuration
-        logger = get_logger("startup")
-        logger.info("Starting SynHome application...")
-
-        # Determine config file path
-        config_file = os.getenv("SYNHOME_CONFIG_FILE", "config/demo.yaml")
-        debug_mode = os.getenv("SYNHOME_DEBUG", "false").lower() == "true"
-
-        # Load configuration
-        app_settings = load_config(
-            config_file=config_file,
-            debug=debug_mode
-        )
-
-        # Setup logging
-        logger = get_logger("synhome_app")
-        setup_logging(
-            console_output=True,
-            file_path="logs/app.log",
-            log_level="DEBUG" if app_settings.debug else "INFO"
-        )
-        logger.info("Logging system initialized")
-
-        # Initialize device manager
-        device_manager = DeviceManager()
-
-        # Load devices from configuration
-        if hasattr(app_settings, 'devices') and app_settings.devices:
-            devices_config = [device.model_dump() for device in app_settings.devices]
-            device_manager.load_devices_from_config(devices_config)
-            logger.info(f"Loaded {len(device_manager.get_all_devices())} devices")
-
-        # Configure LLM control if enabled
-        if (app_settings.zhipuai.enabled and
-            app_settings.zhipuai.api_key and
-            app_settings.zhipuai.api_key.strip()):
-            try:
-                device_manager.enable_llm_control(app_settings.zhipuai.api_key)
-                logger.info("LLM control enabled with ZhipuAI")
-            except Exception as e:
-                logger.warning(f"Failed to enable LLM control: {e}")
-
-        # Store settings in app state
-        app.state.app_settings = app_settings
-        app.state.device_manager = device_manager
-
-        logger.info(f"SynHome application started successfully")
-        logger.info(f"Environment: {app_settings.environment.value}")
-        logger.info(f"Debug mode: {app_settings.debug}")
-
-        yield  # Application is running
-
-    except Exception as e:
-        logger.error(f"Failed to start application: {e}")
-        raise
-
-    finally:
-        # Simple cleanup
-        logger.info("Shutting down SynHome application...")
-        if device_manager:
-            try:
-                if hasattr(device_manager, "adapters"):
-                    for adapter_id, adapter in device_manager.adapters.items():
-                        logger.info(f"Disconnecting adapter: {adapter_id}")
-                        await adapter.disconnect()
-                logger.info("All adapters disconnected")
-            except Exception as e:
-                logger.error(f"Error during adapter cleanup: {e}")
-        logger.info("SynHome application shutdown complete")
-
-# Initialize FastAPI app with lifespan
-app = FastAPI(
-    title="SynHome Smart Home Control System",
-    description="Smart home device control with LLM integration",
-    version="2.0.0",
-    lifespan=lifespan
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app
+app = FastAPI(title="Smart Home Device Control Demo")
 
 # Add middlewares
 app.add_middleware(
@@ -125,16 +44,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(DebugMiddleware)
 
-# Add debug middleware in development mode
-def get_app_settings():
-    """Get app settings from app state or return None if not initialized"""
-    return getattr(app.state, 'app_settings', None)
+# Load configuration using new system
+try:
+    # Use absolute path from project root
+    config_path = project_root / "config/demo.yaml"
+    app_settings = load_config(str(config_path))
+    config = app_settings.model_dump()
+    api_key = config["zhipuai"]["api_key"] if config["zhipuai"]["enabled"] else ""
+except Exception as e:
+    logger.error(f"Error loading config: {str(e)}")
+    api_key = os.getenv("ZHIPUAI_API_KEY", "")
+    # Fallback minimal config
+    config = {"devices": [], "adapters": {}, "physical_devices": {}}
 
-# Add debug middleware only in development
-settings = get_app_settings()
-if settings and settings.debug:
-    app.add_middleware(DebugMiddleware)
+# Create device manager and load devices
+device_manager = DeviceManager()
+
+# Load devices from configuration
+try:
+    device_manager.load_devices_from_config(config["devices"])
+    if api_key:
+        device_manager.enable_llm_control(api_key)
+    logger.info(f"Loaded {len(device_manager.get_all_devices())} devices")
+except Exception as e:
+    logger.error(f"Error loading devices: {str(e)}")
 
 class CommandRequest(BaseModel):
     command: str
@@ -142,33 +77,18 @@ class CommandRequest(BaseModel):
 
 # Set up static files
 static_dir = Path(__file__).parent / "web"
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
+app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
 
 @app.get("/")
 async def root():
     """Serve the main page"""
-    logger = get_logger("api")
     logger.info("Serving index page")
-
-    if static_dir.exists():
-        return FileResponse(static_dir / "index.html")
-    else:
-        return JSONResponse(
-            content={"message": "SynHome API is running", "version": "2.0.0"},
-            status_code=200
-        )
+    return FileResponse(static_dir / "index.html")
 
 @app.get("/devices")
 async def list_devices():
     """Get list of all devices"""
-    api_logger = get_logger("api")
     try:
-        # Get device manager from app state
-        device_manager = getattr(app.state, 'device_manager', None)
-        if not device_manager:
-            raise HTTPException(status_code=503, detail="Device manager not initialized")
-
         device_list = []
         for device in device_manager.get_all_devices():
             device_data = {
@@ -180,7 +100,7 @@ async def list_devices():
             }
             device_list.append(device_data)
 
-        api_logger.info(f"Returning {len(device_list)} devices")
+        logger.info(f"Returning {len(device_list)} devices")
         return JSONResponse(
             content=jsonable_encoder(device_list),
             headers={
@@ -188,31 +108,23 @@ async def list_devices():
                 "Cache-Control": "no-cache"
             }
         )
-    except HTTPException:
-        raise
     except Exception as e:
-        api_logger.error(f"Error listing devices: {str(e)}")
+        logger.error(f"Error listing devices: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/devices/{device_id}/command")
 async def send_command_to_device(device_id: str, command: CommandRequest):
     """Send command to specific device"""
-    api_logger = get_logger("api")
     try:
-        api_logger.info(f"Received command for device {device_id}: {command.command}")
-
-        # Get device manager from app state
-        device_manager = getattr(app.state, 'device_manager', None)
-        if not device_manager:
-            raise HTTPException(status_code=503, detail="Device manager not initialized")
+        logger.info(f"Received command for device {device_id}: {command.command}")
 
         device = device_manager.get_device_by_id(device_id)
         if not device:
-            api_logger.warning(f"Device not found: {device_id}")
+            logger.warning(f"Device not found: {device_id}")
             raise HTTPException(status_code=404, detail="Device not found")
 
         if not device.process_natural_command(command.command):
-            api_logger.warning("Command processing failed")
+            logger.warning("Command processing failed")
             raise HTTPException(status_code=400, detail="Command processing failed")
 
         return JSONResponse(
@@ -231,26 +143,20 @@ async def send_command_to_device(device_id: str, command: CommandRequest):
     except HTTPException:
         raise
     except Exception as e:
-        api_logger.error(f"Error executing command: {str(e)}")
+        logger.error(f"Error executing command: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/command")
 async def process_global_command(command: CommandRequest):
     """Process a command without specifying device"""
-    api_logger = get_logger("api")
     try:
-        api_logger.info(f"Received global command: {command.command}")
-
-        # Get device manager from app state
-        device_manager = getattr(app.state, 'device_manager', None)
-        if not device_manager:
-            raise HTTPException(status_code=503, detail="Device manager not initialized")
+        logger.info(f"Received global command: {command.command}")
 
         result = device_manager.process_command(command.command, command.device_id)
         if not result["success"]:
-            api_logger.warning(f"Command processing failed: {result['message']}")
+            logger.warning(f"Command processing failed: {result['message']}")
             raise HTTPException(status_code=400, detail=result["message"])
-        
+
         # 区分处理不同类型的命令结果
         if "sub_commands" in result:  # 跨设备多操作命令
             return JSONResponse(
@@ -291,178 +197,81 @@ async def process_global_command(command: CommandRequest):
                     "Cache-Control": "no-cache"
                 }
             )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error executing command: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-# Configuration API endpoints
-@app.get("/api/v1/config")
-async def get_configuration():
-    """Get current application configuration"""
-    api_logger = get_logger("api")
-    try:
-        app_settings = getattr(app.state, 'app_settings', None)
-        if not app_settings:
-            raise HTTPException(status_code=503, detail="Configuration not loaded")
-
-        # Return configuration without sensitive data
-        config_dict = app_settings.model_dump(exclude={"zhipuai": {"api_key"}})
-
-        api_logger.info("Configuration retrieved")
-        return JSONResponse(
-            content=jsonable_encoder(config_dict),
-            headers={"Cache-Control": "no-cache"}
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        api_logger.error(f"Error getting configuration: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/v1/config/health")
-async def get_configuration_health():
-    """Get configuration health status"""
-    api_logger = get_logger("api")
-    try:
-        app_settings = getattr(app.state, 'app_settings', None)
-        if not app_settings:
-            raise HTTPException(status_code=503, detail="Configuration not loaded")
-
-        validation_service = get_validation_service()
-        health_result = validation_service.perform_health_check(app_settings)
-
-        api_logger.info("Configuration health check completed")
-        return JSONResponse(
-            content={
-                "status": "healthy" if health_result.is_valid else "unhealthy",
-                "errors": health_result.errors,
-                "warnings": health_result.warnings,
-                "validation_time_ms": health_result.validation_time_ms
-            },
-            headers={"Cache-Control": "no-cache"}
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        api_logger.error(f"Error during health check: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/v1/config/validate")
-async def validate_configuration_data(config_data: Dict[str, Any]):
-    """Validate configuration data"""
-    api_logger = get_logger("api")
-    try:
-        validation_service = get_validation_service()
-        result = validation_service.validate_configuration_data(config_data, "api_validation")
-
-        api_logger.info(f"Configuration validation completed: {result.status.value}")
-        return JSONResponse(
-            content={
-                "status": result.status.value,
-                "is_valid": result.is_valid,
-                "errors": result.errors,
-                "warnings": result.warnings,
-                "validation_time_ms": result.validation_time_ms
-            },
-            headers={"Cache-Control": "no-cache"}
-        )
-    except Exception as e:
-        api_logger.error(f"Error validating configuration: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/v1/config/info")
+@app.get("/device-info")
 async def get_device_info():
-    """Get device configuration information"""
-    api_logger = get_logger("api")
+    """获取设备配置信息"""
     try:
-        app_settings = getattr(app.state, 'app_settings', None)
-        if not app_settings:
-            raise HTTPException(status_code=503, detail="Configuration not loaded")
+        # 从配置文件中获取设备配置
+        device_configs = config.get("devices", [])
 
+        # 提取UI需要的配置信息
         device_types = set()
         capabilities = {}
 
-        # Get device configurations from app settings
-        if hasattr(app_settings, 'devices'):
-            for device in app_settings.devices:
-                device_types.add(device.type)
+        for device_config in device_configs:
+            # 收集设备类型
+            device_type = device_config.get("type")
+            if device_type:
+                device_types.add(device_type)
 
-                for cap_name, cap_config in device.capabilities.items():
+            # 收集能力信息
+            for cap_dict in device_config.get("capabilities", []):
+                for cap_name, cap_config in cap_dict.items():
                     if cap_name not in capabilities:
                         capabilities[cap_name] = {
-                            "type": cap_config.type,
-                            "values": cap_config.values if cap_config.type == "enum" else None,
-                            "unit": cap_config.unit if cap_config.type == "number" else None,
-                            "min_value": cap_config.min_value if hasattr(cap_config, 'min_value') else None,
-                            "max_value": cap_config.max_value if hasattr(cap_config, 'max_value') else None
+                            "type": cap_config.get("type"),
+                            "values": cap_config.get("values") if cap_config.get("type") == "enum" else None,
+                            "unit": cap_config.get("unit") if cap_config.get("type") == "number" else None
                         }
 
-        api_logger.info("Device info retrieved")
         return JSONResponse(
             content=jsonable_encoder({
                 "device_types": list(device_types),
-                "capabilities": capabilities,
-                "total_devices": len(app_settings.devices) if hasattr(app_settings, 'devices') else 0
+                "capabilities": capabilities
             }),
-            headers={"Cache-Control": "no-cache"}
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-cache"
+            }
         )
-    except HTTPException:
-        raise
     except Exception as e:
-        api_logger.error(f"Error getting device info: {str(e)}")
+        logger.error(f"Error getting device info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/status")
-async def get_application_status():
-    """Get application status"""
-    api_logger = get_logger("api")
+@app.on_event("startup")
+async def startup_event():
     try:
-        app_settings = getattr(app.state, 'app_settings', None)
-        device_manager = getattr(app.state, 'device_manager', None)
+        # 加载和初始化所有适配器
+        if "adapters" in config:
+            await device_manager.load_adapters_from_config(config["adapters"])
+            logger.info(f"Initialized {len(device_manager.adapters)} device adapters")
 
-        status = {
-            "application": "SynHome",
-            "version": "2.0.0",
-            "environment": app_settings.environment.value if app_settings else "unknown",
-            "debug": app_settings.debug if app_settings else False,
-            "configuration_loaded": app_settings is not None,
-            "device_manager_initialized": device_manager is not None,
-            "device_count": len(device_manager.get_all_devices()) if device_manager else 0,
-            "llm_enabled": app_settings.zhipuai.enabled if app_settings else False,
-            "uptime_seconds": None  # Could be implemented with uptime tracking
-        }
-
-        api_logger.info("Application status retrieved")
-        return JSONResponse(
-            content=jsonable_encoder(status),
-            headers={"Cache-Control": "no-cache"}
-        )
+            # 将物理设备与虚拟设备关联
+            if "physical_devices" in config:
+                await device_manager.associate_physical_devices(config["physical_devices"])
+                logger.info("Associated physical devices with virtual models")
     except Exception as e:
-        api_logger.error(f"Error getting application status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error initializing adapters: {str(e)}", exc_info=True)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    try:
+        # 断开所有适配器连接
+        if hasattr(device_manager, "adapters"):
+            for adapter_id, adapter in device_manager.adapters.items():
+                logger.info(f"Disconnecting adapter: {adapter_id}")
+                await adapter.disconnect()
+            logger.info("All adapters disconnected")
+    except Exception as e:
+        logger.error(f"Error disconnecting adapters: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
-
-    # Get configuration from environment or use defaults
-    config_file = os.getenv("SYNHOME_CONFIG_FILE", "config/demo.yaml")
-    host = os.getenv("SYNHOME_HOST", "0.0.0.0")
-    port = int(os.getenv("SYNHOME_PORT", "8000"))
-    log_level = os.getenv("SYNHOME_LOG_LEVEL", "info")
-
-    print(f"Starting SynHome server...")
-    print(f"Config file: {config_file}")
-    print(f"Host: {host}")
-    print(f"Port: {port}")
-    print(f"Log level: {log_level}")
-
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        log_level=log_level,
-        access_log=True
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

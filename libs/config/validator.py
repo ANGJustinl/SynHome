@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from pydantic import ValidationError
-from .models import AppSettings, SmartHomeConfig
+from .models import AppSettings
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +69,8 @@ class ConfigValidator:
 
             # Try to create configuration model (this validates the data types)
             try:
-                if path.name.startswith('demo') or 'devices' in str(path):
-                    # This looks like a device config
-                    SmartHomeConfig(**config_data)
-                else:
-                    # Try to parse as app settings
-                    AppSettings(**config_data)
+                # Use AppSettings for all configuration validation
+                AppSettings(**config_data)
 
             except ValidationError as e:
                 # Parse Pydantic errors and make them user-friendly
@@ -271,4 +267,18 @@ class ConfigValidator:
             if not app_settings.zhipuai.api_key or len(app_settings.zhipuai.api_key) < 10:
                 self.errors.append("ZhipuAI API key must be at least 10 characters when enabled")
 
-        return len(self.errors) == 0, self.errors, self.warnings
+
+def validate_config(config: AppSettings) -> Tuple[bool, List[str]]:
+    """
+    Simple validation function for AppSettings.
+
+    Args:
+        config: The configuration to validate
+
+    Returns:
+        Tuple of (is_valid, errors)
+    """
+    validator = ConfigValidator()
+    validator.validate_app_settings(config)
+
+    return len(validator.errors) == 0, validator.errors
