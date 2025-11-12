@@ -1,0 +1,138 @@
+# SynHome 智能功能配置文件
+
+# 基础设置
+smart_features:
+  enabled: true
+  user_id: "default_user"
+
+# 记忆系统配置
+memory:
+  # 记忆窗口设置
+  max_token_limit: 2000          # 最大token数量
+  memory_window_hours: 24       # 记忆时间窗口（小时）
+
+  # 学习设置
+  learning_window_days: 30      # 学习数据窗口（天）
+  min_pattern_occurrences: 3    # 模式最小出现次数
+
+  # 压缩和清理
+  enable_compression: true       # 启用记忆压缩
+  auto_cleanup_days: 90          # 自动清理90天前的记忆
+
+# 习惯学习配置
+habit_learning:
+  # 时间模式
+  time_pattern_detection: true   # 启用时间模式检测
+  daily_pattern_learning: true   # 启用日常模式学习
+
+  # 设备模式
+  device_preference_learning: true  # 启用设备偏好学习
+  sequence_pattern_detection: true  # 启用序列模式检测
+
+  # 环境模式
+  environmental_learning: true   # 启用环境模式学习
+  temperature_sensitivity: 0.5   # 温度敏感度（0-1）
+
+# LLM集成配置
+llm:
+  provider: "zhipuai"
+  model: "glm-4.5-air"
+  api_key_env: "ZHIPUAI_API_KEY"  # 环境变量名
+
+  # 响应参数
+  temperature: 0.2               # 响应随机性（0-1）
+  max_tokens: 1000              # 最大响应token数
+  timeout_seconds: 30            # 请求超时时间
+
+# 建议系统配置
+suggestions:
+  enabled: true                  # 启用建议系统
+  max_suggestions: 3            # 最大建议数量
+  confidence_threshold: 0.4      # 建议置信度阈值
+
+  # 建议类型
+  time_based_suggestions: true   # 基于时间的建议
+  device_based_suggestions: true # 基于设备的建议
+  environmental_suggestions: true # 基于环境的建议
+
+# 数据存储配置
+storage:
+  # 记忆存储
+  memory_storage_type: "file"    # memory/file/database
+  memory_file_path: "data/smart_memory/"
+
+  # 数据导出
+  export_format: "json"         # json/csv/yaml
+  export_directory: "exports/"
+
+  # 数据备份
+  enable_backup: true           # 启用自动备份
+  backup_interval_hours: 24     # 备份间隔（小时）
+
+# 隐私和安全配置
+privacy:
+  # 数据保护
+  enable_encryption: true       # 启用数据加密
+  encryption_key_env: "SMART_MEMORY_KEY"  # 加密密钥环境变量
+
+  # 数据保留
+  personal_data_retention_days: 365  # 个人数据保留天数
+  anonymize_exports: true       # 导出时匿名化数据
+
+  # 用户控制
+  allow_data_export: true       # 允许用户导出数据
+  allow_data_deletion: true     # 允许用户删除数据
+
+# 性能配置
+performance:
+  # 缓存设置
+  enable_cache: true           # 启用缓存
+  cache_ttl_minutes: 30        # 缓存生存时间（分钟）
+
+  # 并发设置
+  max_concurrent_requests: 10  # 最大并发请求数
+  request_timeout_seconds: 5   # 单个请求超时时间
+
+  # 内存管理
+  max_memory_usage_mb: 512     # 最大内存使用量（MB）
+  memory_gc_interval_minutes: 60  # 内存垃圾回收间隔
+
+# 开发和调试配置
+development:
+  # 日志设置
+  log_level: "INFO"            # DEBUG/INFO/WARNING/ERROR
+  log_file: "logs/smart_memory.log"
+
+  # 调试功能
+  enable_debug_mode: false      # 启用调试模式
+  enable_performance_metrics: true  # 启用性能指标
+
+  # 测试模式
+  test_mode: false             # 测试模式
+  mock_llm_responses: false    # 模拟LLM响应
+
+# 集成配置
+integrations:
+  # 现有设备管理器
+  device_manager:
+    auto_integrate: true       # 自动集成到设备管理器
+    fallback_to_basic: true    # 记忆失败时回退到基本功能
+
+  # 外部服务
+  external_services:
+    weather_api_enabled: false  # 天气API集成
+    calendar_integration: false # 日历集成
+
+# 用户体验配置
+user_experience:
+  # 响应个性化
+  personalized_responses: true   # 个性化响应
+  contextual_awareness: true     # 上下文感知
+
+  # 建议显示
+  show_confidence_scores: true  # 显示建议置信度
+  show_pattern_explanations: true # 显示模式解释
+
+  # 学习反馈
+  enable_learning_feedback: true # 启用学习反馈
+  feedback_collection_days: 7    # 反馈收集天数

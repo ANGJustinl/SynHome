@@ -1,0 +1,124 @@
+{
+  "user_id": "test_user",
+  "export_timestamp": "2025-11-12T15:37:53.360360",
+  "conversation_history": [],
+  "learned_patterns": {
+    "hourly_15": {
+      "type": "time_hourly",
+      "confidence": 0.5,
+      "frequency": 5,
+      "context": {
+        "hour": 15,
+        "device_type": "thermostat",
+        "action": "power_on"
+      },
+      "last_updated": "2025-11-12T15:37:53.360268"
+    },
+    "daily_2": {
+      "type": "time_daily",
+      "confidence": 0.5,
+      "frequency": 5,
+      "context": {
+        "day_of_week": 2,
+        "is_weekend": false,
+        "device_type": "thermostat",
+        "action": "power_on"
+      },
+      "last_updated": "2025-11-12T15:37:53.360269"
+    },
+    "device_thermostat": {
+      "type": "device_preference",
+      "confidence": 0.4,
+      "frequency": 4,
+      "context": {
+        "device_type": "thermostat",
+        "action": "power_on",
+        "time_context": "afternoon"
+      },
+      "last_updated": "2025-11-12T15:37:53.360270"
+    },
+    "temp_comfortable_thermostat": {
+      "type": "environmental",
+      "confidence": 0.30000000000000004,
+      "frequency": 3,
+      "context": {
+        "temperature_range": "comfortable",
+        "device_type": "thermostat",
+        "action": "power_on"
+      },
+      "last_updated": "2025-11-12T15:37:53.360264"
+    },
+    "sequence_thermostat_to_thermostat": {
+      "type": "sequence_pattern",
+      "confidence": 0.2,
+      "frequency": 2,
+      "context": {
+        "from_device": "thermostat",
+        "to_device": "thermostat",
+        "time_gap_minutes": 6.5e-07
+      },
+      "last_updated": "2025-11-12T15:37:53.360271"
+    },
+    "device_light": {
+      "type": "device_preference",
+      "confidence": 0.1,
+      "frequency": 1,
+      "context": {
+        "device_type": "light",
+        "action": "set_brightness",
+        "time_context": "afternoon"
+      },
+      "last_updated": "2025-11-12T15:37:53.360253"
+    },
+    "sequence_thermostat_to_light": {
+      "type": "sequence_pattern",
+      "confidence": 0.1,
+      "frequency": 1,
+      "context": {
+        "from_device": "thermostat",
+        "to_device": "light",
+        "time_gap_minutes": 3.3333333333333335e-07
+      },
+      "last_updated": "2025-11-12T15:37:53.360255"
+    },
+    "temp_comfortable_light": {
+      "type": "environmental",
+      "confidence": 0.1,
+      "frequency": 1,
+      "context": {
+        "temperature_range": "comfortable",
+        "device_type": "light",
+        "action": "set_brightness"
+      },
+      "last_updated": "2025-11-12T15:37:53.360257"
+    },
+    "sequence_light_to_thermostat": {
+      "type": "sequence_pattern",
+      "confidence": 0.1,
+      "frequency": 1,
+      "context": {
+        "from_device": "light",
+        "to_device": "thermostat",
+        "time_gap_minutes": 1.8333333333333333e-07
+      },
+      "last_updated": "2025-11-12T15:37:53.360264"
+    },
+    "temp_hot_thermostat": {
+      "type": "environmental",
+      "confidence": 0.1,
+      "frequency": 1,
+      "context": {
+        "temperature_range": "hot",
+        "device_type": "thermostat",
+        "action": "power_on"
+      },
+      "last_updated": "2025-11-12T15:37:53.360272"
+    }
+  },
+  "statistics": {
+    "total_interactions": 0,
+    "learned_patterns": 0,
+    "memory_size": 0,
+    "last_activity": null
+  }
+}

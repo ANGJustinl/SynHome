@@ -1,0 +1,12 @@
+{
+  "user_id": "demo_user",
+  "export_timestamp": "2025-11-12T15:25:32.656050",
+  "conversation_history": [],
+  "learned_patterns": {},
+  "statistics": {
+    "total_interactions": 0,
+    "learned_patterns": 0,
+    "memory_size": 0,
+    "last_activity": null
+  }
+}

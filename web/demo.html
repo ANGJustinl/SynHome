@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SynHome 智能家居演示系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: system, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-online {
+            background-color: #67c23a;
+        }
+
+        .status-offline {
+            background-color: #f56c6c;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* 设备网格 */
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .device-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .device-icon {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            border-radius: 12px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .device-info h3 {
+            margin: 0 0 5px 0;
+            color: #303133;
+            font-size: 1.2em;
+        }
+
+        .device-type {
+            color: #909399;
+            font-size: 0.9em;
+        }
+
+        .device-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-text {
+            font-weight: 500;
+        }
+
+        .device-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .control-label {
+            color: #606266;
+            font-weight: 500;
+        }
+
+        .control-value {
+            font-weight: 600;
+            color: #409eff;
+        }
+
+        .control-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* 数据面板 */
+        .stats-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #409eff;
+        }
+
+        .stat-label {
+            color: #909399;
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        /* 消息日志 */
+        .message-log {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-left: 4px solid #409eff;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .log-item.success {
+            border-left-color: #67c23a;
+        }
+
+        .log-item.error {
+            border-left-color: #f56c6c;
+        }
+
+        .log-time {
+            color: #909399;
+            font-size: 0.8em;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .devices-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <h1>🏠 SynHome 智能家居演示系统</h1>
+            <p>实时设备控制与状态监控</p>
+        </div>
+
+        <div class="container">
+            <!-- 控制面板 -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <h2>控制中心</h2>
+                    <div class="server-status">
+                        <div class="status-indicator" :class="serverConnected ? 'status-online' : 'status-offline'"></div>
+                        <span>{{ serverConnected ? '服务器已连接' : '服务器离线' }}</span>
+                        <el-tag v-if="deviceCount > 0" type="success">{{ deviceCount }} 设备在线</el-tag>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <el-input
+                        v-model="commandInput"
+                        placeholder="输入设备控制命令，如：打开客厅空调、调暗灯光"
+                        @keyup.enter="sendCommand"
+                        style="flex: 1;"
+                    >
+                        <template #append>
+                            <el-button @click="sendCommand" type="primary">发送命令</el-button>
+                        </template>
+                    </el-input>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <span style="margin-right: 10px;">快速命令：</span>
+                    <el-button
+                        v-for="cmd in quickCommands"
+                        :key="cmd"
+                        size="small"
+                        @click="useCommand(cmd)"
+                        style="margin-right: 8px; margin-bottom: 8px;"
+                    >
+                        {{ cmd }}
+                    </el-button>
+                </div>
+            </div>
+
+            <!-- 设备网格 -->
+            <div class="devices-grid">
+                <div v-for="device in devices" :key="device.device_id" class="device-card">
+                    <div class="device-header">
+                        <div class="device-icon">{{ getDeviceIcon(device.device_type) }}</div>
+                        <div class="device-info">
+                            <h3>{{ device.name }}</h3>
+                            <div class="device-type">{{ device.device_type.toUpperCase() }}</div>
+                        </div>
+                        <div class="device-status">
+                            <el-tag :type="device.online ? 'success' : 'danger'" size="small">
+                                {{ device.online ? '在线' : '离线' }}
+                            </el-tag>
+                        </div>
+                    </div>
+
+                    <div class="device-controls">
+                        <div v-for="(value, key) in device.current_state" :key="key" class="control-item">
+                            <span class="control-label">{{ getCapabilityName(key) }}</span>
+                            <span class="control-value">{{ formatValue(key, value) }}</span>
+                        </div>
+
+                        <div class="control-actions">
+                            <el-button
+                                v-if="device.current_state.power !== undefined"
+                                :type="device.current_state.power === 'on' ? 'danger' : 'success'"
+                                size="small"
+                                @click="toggleDevice(device.device_id, 'power', device.current_state.power === 'on' ? 'off' : 'on')"
+                            >
+                                {{ device.current_state.power === 'on' ? '关闭' : '开启' }}
+                            </el-button>
+
+                            <el-button
+                                v-if="device.device_type === 'thermostat'"
+                                type="primary"
+                                size="small"
+                                @click="showTempDialog(device)"
+                            >
+                                调节温度
+                            </el-button>
+
+                            <el-button
+                                v-if="device.device_type === 'light'"
+                                type="warning"
+                                size="small"
+                                @click="showBrightnessDialog(device)"
+                            >
+                                调节亮度
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 统计面板 -->
+            <div class="stats-panel">
+                <h3>系统状态</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ deviceCount }}</div>
+                        <div class="stat-label">设备总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ onlineDeviceCount }}</div>
+                        <div class="stat-label">在线设备</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ activeDeviceCount }}</div>
+                        <div class="stat-label">活跃设备</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ totalCommands }}</div>
+                        <div class="stat-label">命令总数</div>
+                    </div>
+                </div>
+
+                <div class="chart-container" ref="deviceStatusChart"></div>
+            </div>
+
+            <!-- 消息日志 -->
+            <div class="message-log">
+                <h3>操作日志</h3>
+                <div v-for="(log, index) in messageLogs" :key="index" :class="['log-item', log.type]">
+                    <span class="log-time">{{ log.time }}</span>
+                    {{ log.message }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 温度调节对话框 -->
+        <el-dialog v-model="tempDialogVisible" title="调节温度" width="400px">
+            <el-slider v-model="tempValue" :min="16" :max="32" show-input/>
+            <template #footer>
+                <el-button @click="tempDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="setTemperature">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 亮度调节对话框 -->
+        <el-dialog v-model="brightnessDialogVisible" title="调节亮度" width="400px">
+            <el-slider v-model="brightnessValue" :min="0" :max="100" show-input/>
+            <template #footer>
+                <el-button @click="brightnessDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="setBrightness">确定</el-button>
+            </template>
+        </el-dialog>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue
+
+        const app = createApp({
+            setup() {
+                // 响应式数据
+                const devices = ref([])
+                const serverConnected = ref(false)
+                const deviceCount = ref(0)
+                const onlineDeviceCount = ref(0)
+                const activeDeviceCount = ref(0)
+                const totalCommands = ref(0)
+                const messageLogs = ref([])
+                const commandInput = ref('')
+
+                // 对话框状态
+                const tempDialogVisible = ref(false)
+                const brightnessDialogVisible = ref(false)
+                const tempValue = ref(24)
+                const brightnessValue = ref(50)
+                const currentDevice = ref(null)
+
+                // 快速命令
+                const quickCommands = [
+                    "打开客厅空调",
+                    "关闭所有灯光",
+                    "设置温度到26度",
+                    "调暗客厅灯光",
+                    "启动电饭煲",
+                    "全部设备关闭"
+                ]
+
+                // API基础地址
+                const API_BASE = 'http://localhost:8000'
+
+                // 获取设备图标
+                const getDeviceIcon = (type) => {
+                    const icons = {
+                        'thermostat': '❄️',
+                        'light': '💡',
+                        'rice_cooker': '🍚',
+                        'washing_machine': '🌊'
+                    }
+                    return icons[type] || '📱'
+                }
+
+                // 获取能力名称
+                const getCapabilityName = (key) => {
+                    const names = {
+                        'power': '电源',
+                        'temperature': '温度',
+                        'brightness': '亮度',
+                        'color': '颜色',
+                        'mode': '模式',
+                        'program': '程序',
+                        'timer': '定时器'
+                    }
+                    return names[key] || key
+                }
+
+                // 格式化值
+                const formatValue = (key, value) => {
+                    if (key === 'power') return value === 'on' ? '开启' : '关闭'
+                    if (key === 'temperature') return `${value}°C`
+                    if (key === 'brightness') return `${value}%`
+                    return value
+                }
+
+                // 添加日志
+                const addLog = (message, type = '') => {
+                    messageLogs.value.unshift({
+                        time: new Date().toLocaleTimeString(),
+                        message,
+                        type
+                    })
+                    if (messageLogs.value.length > 50) {
+                        messageLogs.value.pop()
+                    }
+                }
+
+                // 获取设备列表
+                const fetchDevices = async () => {
+                    try {
+                        const response = await axios.get(`${API_BASE}/devices`)
+                        devices.value = response.data.devices || []
+                        deviceCount.value = devices.value.length
+                        onlineDeviceCount.value = devices.value.filter(d => d.online).length
+                        activeDeviceCount.value = devices.value.filter(d => d.online && d.current_state.power === 'on').length
+                        serverConnected.value = true
+
+                        addLog(`成功获取设备列表：${deviceCount.value} 个设备`, 'success')
+                    } catch (error) {
+                        console.error('获取设备失败:', error)
+                        serverConnected.value = false
+                        addLog(`获取设备失败: ${error.message}`, 'error')
+                    }
+                }
+
+                // 发送设备命令
+                const sendDeviceCommand = async (deviceId, capability, value) => {
+                    try {
+                        const response = await axios.post(`${API_BASE}/devices/${deviceId}/command`, {
+                            device_id: deviceId,
+                            capability: capability,
+                            value: value
+                        })
+
+                        if (response.data.success) {
+                            addLog(`设备控制成功: ${deviceId} ${capability} = ${value}`, 'success')
+                            totalCommands.value++
+                            await fetchDevices() // 刷新设备状态
+                        } else {
+                            addLog(`设备控制失败: ${response.data.message || '未知错误'}`, 'error')
+                        }
+                    } catch (error) {
+                        console.error('设备控制失败:', error)
+                        addLog(`设备控制失败: ${error.response?.data?.detail || error.message}`, 'error')
+                    }
+                }
+
+                // 发送命令
+                const sendCommand = async () => {
+                    if (!commandInput.value.trim()) return
+
+                    const command = commandInput.value.trim()
+                    addLog(`发送命令: ${command}`)
+
+                    // 简单的命令解析
+                    if (command.includes('空调') || command.includes('温度')) {
+                        // 空调命令
+                        const thermostat = devices.value.find(d => d.device_type === 'thermostat')
+                        if (thermostat) {
+                            if (command.includes('打开')) {
+                                await sendDeviceCommand(thermostat.device_id, 'power', 'on')
+                            } else if (command.includes('关闭')) {
+                                await sendDeviceCommand(thermostat.device_id, 'power', 'off')
+                            } else if (command.includes('26')) {
+                                await sendDeviceCommand(thermostat.device_id, 'temperature', 26)
+                            } else {
+                                addLog('无法识别的空调命令', 'error')
+                            }
+                        }
+                    } else if (command.includes('灯') || command.includes('亮度')) {
+                        // 灯光命令
+                        const light = devices.value.find(d => d.device_type === 'light')
+                        if (light) {
+                            if (command.includes('打开')) {
+                                await sendDeviceCommand(light.device_id, 'power', 'on')
+                            } else if (command.includes('关闭')) {
+                                await sendDeviceCommand(light.device_id, 'power', 'off')
+                            } else if (command.includes('调暗')) {
+                                await sendDeviceCommand(light.device_id, 'brightness', 30)
+                            } else {
+                                addLog('无法识别的灯光命令', 'error')
+                            }
+                        }
+                    } else if (command.includes('电饭煲') || command.includes('煮饭')) {
+                        // 电饭煲命令
+                        const cooker = devices.value.find(d => d.device_type === 'rice_cooker')
+                        if (cooker) {
+                            if (command.includes('启动') || command.includes('开始')) {
+                                await sendDeviceCommand(cooker.device_id, 'power', 'on')
+                            } else {
+                                addLog('无法识别的电饭煲命令', 'error')
+                            }
+                        }
+                    } else if (command.includes('全部关闭')) {
+                        // 关闭所有设备
+                        for (const device of devices.value) {
+                            if (device.current_state.power === 'on') {
+                                await sendDeviceCommand(device.device_id, 'power', 'off')
+                            }
+                        }
+                    } else {
+                        addLog('无法识别的命令，请尝试更具体的描述', 'error')
+                    }
+
+                    commandInput.value = ''
+                }
+
+                // 使用快速命令
+                const useCommand = (cmd) => {
+                    commandInput.value = cmd
+                    sendCommand()
+                }
+
+                // 切换设备
+                const toggleDevice = async (deviceId, capability, value) => {
+                    await sendDeviceCommand(deviceId, capability, value)
+                }
+
+                // 显示温度对话框
+                const showTempDialog = (device) => {
+                    currentDevice.value = device
+                    tempValue.value = device.current_state.temperature || 24
+                    tempDialogVisible.value = true
+                }
+
+                // 设置温度
+                const setTemperature = async () => {
+                    if (currentDevice.value) {
+                        await sendDeviceCommand(currentDevice.value.device_id, 'temperature', tempValue.value)
+                        tempDialogVisible.value = false
+                    }
+                }
+
+                // 显示亮度对话框
+                const showBrightnessDialog = (device) => {
+                    currentDevice.value = device
+                    brightnessValue.value = device.current_state.brightness || 50
+                    brightnessDialogVisible.value = true
+                }
+
+                // 设置亮度
+                const setBrightness = async () => {
+                    if (currentDevice.value) {
+                        await sendDeviceCommand(currentDevice.value.device_id, 'brightness', brightnessValue.value)
+                        brightnessDialogVisible.value = false
+                    }
+                }
+
+                // 初始化图表
+                const initChart = () => {
+                    nextTick(() => {
+                        const chartDom = app.config.globalProperties.$refs?.deviceStatusChart
+                        if (chartDom && window.echarts) {
+                            const myChart = window.echarts.init(chartDom)
+
+                            const option = {
+                                title: {
+                                    text: '设备状态分布',
+                                    left: 'center'
+                                },
+                                tooltip: {
+                                    trigger: 'item'
+                                },
+                                legend: {
+                                    orient: 'vertical',
+                                    left: 'left'
+                                },
+                                series: [
+                                    {
+                                        name: '设备状态',
+                                        type: 'pie',
+                                        radius: '50%',
+                                        data: [
+                                            { value: onlineDeviceCount.value, name: '在线设备' },
+                                            { value: deviceCount.value - onlineDeviceCount.value, name: '离线设备' }
+                                        ],
+                                        emphasis: {
+                                            itemStyle: {
+                                                shadowBlur: 10,
+                                                shadowOffsetX: 0,
+                                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+
+                            myChart.setOption(option)
+                        }
+                    })
+                }
+
+                // 定期刷新设备状态
+                const startStatusPolling = () => {
+                    setInterval(() => {
+                        fetchDevices()
+                    }, 5000) // 每5秒刷新一次
+                }
+
+                // 组件挂载
+                onMounted(() => {
+                    fetchDevices()
+                    startStatusPolling()
+                    addLog('系统初始化完成', 'success')
+
+                    // 延迟初始化图表
+                    setTimeout(() => {
+                        initChart()
+                    }, 1000)
+                })
+
+                return {
+                    // 数据
+                    devices,
+                    serverConnected,
+                    deviceCount,
+                    onlineDeviceCount,
+                    activeDeviceCount,
+                    totalCommands,
+                    messageLogs,
+                    commandInput,
+                    quickCommands,
+
+                    // 对话框
+                    tempDialogVisible,
+                    brightnessDialogVisible,
+                    tempValue,
+                    brightnessValue,
+
+                    // 方法
+                    getDeviceIcon,
+                    getCapabilityName,
+                    formatValue,
+                    sendCommand,
+                    useCommand,
+                    toggleDevice,
+                    showTempDialog,
+                    showBrightnessDialog,
+                    setTemperature,
+                    setBrightness
+                }
+            }
+        })
+
+        app.use(ElementPlus)
+        app.mount('#app')
+    </script>
+</body>
+</html>

@@ -1,0 +1,993 @@
+openapi: 3.0.3
+info:
+  title: SynHome Smart Features API
+  description: API for smart home intelligence features including memory, analytics, and remote control
+  version: 1.0.0
+  contact:
+    name: SynHome Team
+  license:
+    name: GPL-3.0
+
+servers:
+  - url: https://api.synhome.com/v1
+    description: Production server
+  - url: https://staging-api.synhome.com/v1
+    description: Staging server
+
+paths:
+  /memory:
+    get:
+      summary: Get user memories
+      description: Retrieve memories for the authenticated user with filtering options
+      tags:
+        - Memory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [episodic, semantic, working]
+          description: Filter by memory type
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of memories to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of memories to skip
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Semantic search query
+      responses:
+        '200':
+          description: Memories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MemoryEntry'
+                  total:
+                    type: integer
+                    description: Total number of memories matching criteria
+                  has_more:
+                    type: boolean
+                    description: Whether there are more memories available
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create memory entry
+      description: Store a new memory entry for the user
+      tags:
+        - Memory
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - content
+              properties:
+                type:
+                  type: string
+                  enum: [episodic, semantic, working]
+                  description: Memory type
+                content:
+                  type: object
+                  description: Memory content
+                context:
+                  type: object
+                  description: Contextual information
+                importance_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  description: Importance score (0-1)
+                expires_at:
+                  type: string
+                  format: date-time
+                  description: Memory expiration time
+      responses:
+        '201':
+          description: Memory created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /memory/{memory_id}:
+    get:
+      summary: Get specific memory
+      description: Retrieve a specific memory entry by ID
+      tags:
+        - Memory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memory_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Memory retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryEntry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete memory
+      description: Delete a specific memory entry
+      tags:
+        - Memory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: memory_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Memory deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /patterns:
+    get:
+      summary: Get user patterns
+      description: Retrieve learned patterns for the user
+      tags:
+        - Patterns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [temporal, device_combination, conditional]
+          description: Filter by pattern type
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Only return active patterns
+        - name: min_confidence
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+            default: 0.5
+          description: Minimum confidence threshold
+      responses:
+        '200':
+          description: Patterns retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  patterns:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pattern'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create custom pattern
+      description: Create a custom automation pattern
+      tags:
+        - Patterns
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - conditions
+                - actions
+              properties:
+                name:
+                  type: string
+                  description: Human readable pattern name
+                description:
+                  type: string
+                  description: Pattern description
+                conditions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PatternCondition'
+                actions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PatternAction'
+                time_constraints:
+                  $ref: '#/components/schemas/TimeConstraints'
+      responses:
+        '201':
+          description: Pattern created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pattern'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/dashboard:
+    get:
+      summary: Get analytics dashboard data
+      description: Retrieve comprehensive analytics data for dashboard
+      tags:
+        - Analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: month
+          description: Time period for analytics
+        - name: household_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Household ID (optional, uses user's household if not provided)
+      responses:
+        '200':
+          description: Analytics data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/insights:
+    get:
+      summary: Get user insights
+      description: Retrieve insights and recommendations for the user
+      tags:
+        - Analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [energy_saving, usage_pattern, anomaly, recommendation]
+          description: Filter by insight type
+        - name: unread_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Only return unread insights
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Insights retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  insights:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Insight'
+                  total:
+                    type: integer
+                  unread_count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/insights/{insight_id}/read:
+    post:
+      summary: Mark insight as read
+      description: Mark an insight as read by the user
+      tags:
+        - Analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: insight_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Insight marked as read
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /remote/connect:
+    post:
+      summary: Establish remote connection
+      description: Initialize remote control session for device access
+      tags:
+        - Remote Control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - device_info
+                - authentication_token
+              properties:
+                device_info:
+                  type: object
+                  description: Device and application information
+                  properties:
+                    platform:
+                      type: string
+                      enum: [ios, android, web, desktop]
+                    app_version:
+                      type: string
+                    device_model:
+                      type: string
+                authentication_token:
+                  type: string
+                  description: JWT token for authentication
+      responses:
+        '200':
+          description: Remote session established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /remote/devices:
+    get:
+      summary: Get accessible devices
+      description: Get list of devices accessible through remote connection
+      tags:
+        - Remote Control
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Devices retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RemoteDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /remote/devices/{device_id}/control:
+    post:
+      summary: Control device remotely
+      description: Send control command to a device
+      tags:
+        - Remote Control
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  description: Device command
+                parameters:
+                  type: object
+                  description: Command parameters
+      responses:
+        '200':
+          description: Command executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  result:
+                    type: object
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /share/create:
+    post:
+      summary: Create device share
+      description: Create a sharing link for devices
+      tags:
+        - Sharing
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - device_ids
+                - permissions
+              properties:
+                device_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: List of device IDs to share
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [view, control, configure]
+                  description: Permissions to grant
+                recipient_email:
+                  type: string
+                  format: email
+                  description: Email of recipient (optional for temporary access)
+                expires_hours:
+                  type: integer
+                  minimum: 1
+                  maximum: 8760
+                  default: 24
+                  description: Share expiration in hours
+                time_restrictions:
+                  $ref: '#/components/schemas/TimeRestrictions'
+      responses:
+        '201':
+          description: Share created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharePermission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /share/{share_code}/access:
+    post:
+      summary: Access shared devices
+      description: Access devices through a share code
+      tags:
+        - Sharing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - access_token
+              properties:
+                access_token:
+                  type: string
+                  description: Temporary access token
+      responses:
+        '200':
+          description: Access granted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_token:
+                    type: string
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RemoteDevice'
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    MemoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [episodic, semantic, working]
+        timestamp:
+          type: string
+          format: date-time
+        content:
+          type: object
+        context:
+          type: object
+        importance_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        expires_at:
+          type: string
+          format: date-time
+        is_compressed:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Pattern:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [temporal, device_combination, conditional]
+        name:
+          type: string
+        description:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        frequency:
+          type: integer
+          minimum: 1
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatternCondition'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatternAction'
+        time_constraints:
+          $ref: '#/components/schemas/TimeConstraints'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+
+    PatternCondition:
+      type: object
+      required:
+        - type
+        - value
+      properties:
+        type:
+          type: string
+          enum: [device_state, time, weather, user_presence]
+        device_id:
+          type: string
+        property:
+          type: string
+        operator:
+          type: string
+          enum: [equals, not_equals, greater_than, less_than, contains]
+        value:
+          type: object
+
+    PatternAction:
+      type: object
+      required:
+        - type
+        - device_id
+      properties:
+        type:
+          type: string
+          enum: [device_control, notification, scene_activation]
+        device_id:
+          type: string
+        parameters:
+          type: object
+
+    TimeConstraints:
+      type: object
+      properties:
+        start_time:
+          type: string
+          pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+        end_time:
+          type: string
+          pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+        days_of_week:
+          type: array
+          items:
+            type: string
+            enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        timezone:
+          type: string
+
+    DashboardData:
+      type: object
+      properties:
+        overview:
+          type: object
+          properties:
+            total_devices:
+              type: integer
+            active_devices:
+              type: integer
+            energy_usage:
+              type: number
+            cost_estimate:
+              type: number
+        charts:
+          type: object
+          properties:
+            usage_timeline:
+              $ref: '#/components/schemas/ChartData'
+            device_breakdown:
+              $ref: '#/components/schemas/ChartData'
+            cost_trend:
+              $ref: '#/components/schemas/ChartData'
+        recent_activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentActivity'
+
+    ChartData:
+      type: object
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChartDataset'
+
+    ChartDataset:
+      type: object
+      properties:
+        label:
+          type: string
+        data:
+          type: array
+          items:
+            type: number
+        backgroundColor:
+          type: string
+
+    RecentActivity:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        device_name:
+          type: string
+        action:
+          type: string
+        user:
+          type: string
+
+    Insight:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [energy_saving, usage_pattern, anomaly, recommendation]
+        title:
+          type: string
+        description:
+          type: string
+        impact_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        actionability:
+          type: string
+          enum: [informational, suggestion, critical]
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        is_read:
+          type: boolean
+        is_dismissed:
+          type: boolean
+
+    RemoteSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        token:
+          type: string
+        device_info:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+
+    RemoteDevice:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, error]
+        capabilities:
+          type: array
+          items:
+            type: string
+        current_state:
+          type: object
+        last_seen:
+          type: string
+          format: date-time
+
+    SharePermission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        shared_with_user_id:
+          type: string
+          format: uuid
+        share_code:
+          type: string
+        device_ids:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [view, control, configure]
+        time_restrictions:
+          $ref: '#/components/schemas/TimeRestrictions'
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        access_count:
+          type: integer
+
+    TimeRestrictions:
+      type: object
+      properties:
+        allowed_hours:
+          type: object
+          properties:
+            start:
+              type: string
+              pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+            end:
+              type: string
+              pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+        allowed_days:
+          type: array
+          items:
+            type: string
+            enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        timezone:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+tags:
+  - name: Memory
+    description: User memory and learning system
+  - name: Patterns
+    description: Pattern recognition and automation
+  - name: Analytics
+    description: Analytics and insights
+  - name: Remote Control
+    description: Remote device control
+  - name: Sharing
+    description: Device sharing and permissions

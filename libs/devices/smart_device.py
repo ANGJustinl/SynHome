@@ -381,5 +381,66 @@ class SmartDevice:
             result = self.set_capability("power", "off")
             self.state = DeviceState.OFF
             return result
-            
+
         return False
+
+    def get_current_state(self) -> Dict[str, Any]:
+        """
+        Get current state of all device capabilities.
+
+        Returns:
+            Dictionary containing current state of all capabilities
+        """
+        state = {
+            "device_name": self.name,
+            "device_type": self.type,
+            "state": self.state.value if self.state else None,
+            "capabilities": {}
+        }
+
+        for name, capability in self.capabilities.items():
+            cap_state = {
+                "type": capability.type.value,
+                "current_value": capability.current_value
+            }
+
+            # Add type-specific information
+            if capability.type == CapabilityType.SWITCH:
+                cap_state["states"] = capability.states
+            elif capability.type == CapabilityType.NUMBER:
+                cap_state.update({
+                    "min": capability.min_value,
+                    "max": capability.max_value,
+                    "unit": capability.unit
+                })
+            elif capability.type == CapabilityType.ENUM:
+                cap_state["values"] = capability.values
+
+            state["capabilities"][name] = cap_state
+
+        return state
+
+    def process_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Process a device command with optional parameters.
+
+        Args:
+            command: The command to execute
+            params: Optional parameters for the command
+
+        Returns:
+            True if command was processed successfully, False otherwise
+        """
+        if params is None:
+            params = {}
+
+        try:
+            # Check if this is a natural language command that needs LLM processing
+            if any(phrase in command for phrase in ["打开", "关闭", "设置", "调", "切换", "开启", "停止"]):
+                return self.process_natural_command(command)
+            else:
+                # Process as a structured command
+                return self._process_single_operation(command, params)
+        except Exception as e:
+            logger.error(f"Error processing command '{command}': {e}")
+            return False
