@@ -1,0 +1,37 @@
+# SynHome Base Configuration
+# This file contains the default configuration for SynHome smart home control system
+
+# Application Settings
+environment: development
+debug: false
+host: "0.0.0.0"
+port: 8000
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"
+  file_path: "logs/app.log"
+  max_size: "100 MB"
+  retention: "30 days"
+  compression: "zip"
+  rotation: "1 day"
+  serialize: false
+  enqueue: true
+
+# Hot Reload Configuration
+hot_reload:
+  enabled: true
+  watch_files: ["*.yaml", "*.yml", "*.json"]
+  debounce_seconds: 1.0
+  reloadable_sections: ["logging", "zhipuai", "device_groups", "scenes"]
+
+# Feature Flags
+features:
+  enhanced_logging: true
+  advanced_validation: true
+  metrics_collection: true
+
+# Smart Home Configuration (loaded from demo.yaml)
+# Device configurations are maintained separately for backward compatibility
+devices_file: "config/demo.yaml"

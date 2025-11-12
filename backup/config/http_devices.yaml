@@ -1,0 +1,141 @@
+# HTTP devices configuration examples
+
+devices:
+  # Example smart light with basic auth
+  - id: "http_light"
+    name: "HTTP Smart Light"
+    type: "light"
+    api:
+      base_url: "http://192.168.1.100/api"
+      auth_type: "basic"
+      auth:
+        username: "admin"
+        password: "password123"
+      timeout: 5
+      verify_ssl: true
+      commands:
+        power:
+          method: "PUT"
+          endpoint: "state"
+          value_key: "state.power"
+          data_template:
+            state:
+              power: null  # Will be filled with actual value
+          value_map:
+            "on": true
+            "off": false
+        brightness:
+          method: "PUT"
+          endpoint: "state"
+          value_key: "state.brightness"
+          data_template:
+            state:
+              brightness: null  # Will be filled with actual value
+          scale: 2.55  # Convert 0-100 to 0-255
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - brightness:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"
+
+  # Example thermostat with bearer token auth
+  - id: "http_thermostat"
+    name: "HTTP Smart Thermostat"
+    type: "thermostat"
+    api:
+      base_url: "https://api.thermostat.com/v1"
+      auth_type: "bearer"
+      auth:
+        token: "your_access_token_here"
+      commands:
+        power:
+          method: "POST"
+          endpoint: "devices/thermostat/power"
+          value_key: "power"
+        temperature:
+          method: "POST"
+          endpoint: "devices/thermostat/temperature"
+          value_key: "target_temperature"
+        mode:
+          method: "POST"
+          endpoint: "devices/thermostat/mode"
+          value_key: "mode"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - temperature:
+          type: "number"
+          min: 16
+          max: 30
+          unit: "°C"
+      - mode:
+          type: "enum"
+          values: ["auto", "cool", "heat", "fan"]
+
+  # Example smart plug with API key auth
+  - id: "http_plug"
+    name: "HTTP Smart Plug"
+    type: "socket"
+    api:
+      base_url: "https://api.smartplug.com"
+      auth_type: "api_key"
+      auth:
+        key: "your_api_key_here"
+        key_name: "X-API-Key"
+        location: "header"
+      commands:
+        power:
+          method: "POST"
+          endpoint: "plug/control"
+          value_key: "state"
+          value_map:
+            "on": 1
+            "off": 0
+        energy:
+          method: "GET"
+          endpoint: "plug/energy"
+          value_key: "current_power"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - energy:
+          type: "number"
+          min: 0
+          max: 2200
+          unit: "W"
+
+  # Example smart curtain with OAuth2 auth
+  - id: "http_curtain"
+    name: "HTTP Smart Curtain"
+    type: "curtain"
+    api:
+      base_url: "https://api.smartcurtain.com"
+      auth_type: "oauth2"
+      auth:
+        token_url: "https://auth.smartcurtain.com/oauth/token"
+        client_id: "your_client_id"
+        client_secret: "your_client_secret"
+      commands:
+        power:
+          method: "POST"
+          endpoint: "curtain/power"
+          value_key: "power_state"
+        position:
+          method: "POST"
+          endpoint: "curtain/position"
+          value_key: "position"
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - position:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"

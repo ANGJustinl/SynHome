@@ -1,0 +1,32 @@
+# Testing Environment Configuration
+# Extends base.yaml with testing-specific settings
+
+environment: testing
+debug: false
+
+logging:
+  level: "DEBUG"
+  serialize: true
+  file_path: "logs/test.log"
+
+# Testing-specific feature flags
+features:
+  enhanced_logging: true
+  debug_mode: false
+  mock_external_services: true
+  test_mode: true
+
+# Testing logging (structured for parsing)
+logging:
+  level: "DEBUG"
+  serialize: true
+  console_output: false
+  file_path: "logs/test.log"
+
+# Testing-specific configuration
+hot_reload:
+  enabled: false
+
+# Testing timeouts
+request_timeout: 30
+connection_timeout: 10

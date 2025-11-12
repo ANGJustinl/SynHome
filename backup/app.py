@@ -22,8 +22,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 
-# Import simplified configuration system
+# Import new configuration system
 from libs.config import load_config, AppSettings
+from libs.config.startup import validate_startup_config
+from libs.config.validation_service import get_validation_service
 from libs.logging import setup_logging, get_logger
 from libs.devices.device_manager import DeviceManager
 from apps.demo.debug_middleware import DebugMiddleware
@@ -35,57 +37,111 @@ logger = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Simple application lifespan for SynHome."""
+    """Application lifespan with proper configuration validation and initialization"""
     global app_settings, device_manager, logger
 
+    logger = get_logger("startup")
+
     try:
-        # Load configuration
-        logger = get_logger("startup")
-        logger.info("Starting SynHome application...")
+        # Step 1: Validate and load configuration
+        logger.info("Starting SynHome application with configuration validation...")
 
         # Determine config file path
         config_file = os.getenv("SYNHOME_CONFIG_FILE", "config/demo.yaml")
-        debug_mode = os.getenv("SYNHOME_DEBUG", "false").lower() == "true"
 
-        # Load configuration
-        app_settings = load_config(
+        # Perform startup validation
+        startup_result = validate_startup_config(
             config_file=config_file,
-            debug=debug_mode
+            strict_mode=os.getenv("SYNHOME_STRICT_VALIDATION", "false").lower() == "true",
+            auto_migrate=os.getenv("SYNHOME_AUTO_MIGRATE", "true").lower() == "true"
         )
 
-        # Setup logging
+        if not startup_result.success:
+            logger.error("Configuration validation failed during startup")
+            logger.error(f"Critical errors: {startup_result.critical_failures}")
+            logger.error(f"Recommendations: {startup_result.recommendations}")
+
+            # In development mode, we might want to continue with warnings
+            if startup_result.app_settings and startup_result.app_settings.environment.value == "development":
+                logger.warning("Continuing in development mode despite configuration issues")
+                app_settings = startup_result.app_settings
+            else:
+                logger.error("Cannot start application due to critical configuration errors")
+                raise RuntimeError(f"Configuration validation failed: {'; '.join(startup_result.critical_failures)}")
+        else:
+            app_settings = startup_result.app_settings
+            logger.info("Configuration validation completed successfully")
+
+            # Log any warnings
+            if startup_result.warnings:
+                for warning in startup_result.warnings:
+                    logger.warning(f"Configuration warning: {warning}")
+
+            # Log recommendations
+            if startup_result.recommendations:
+                logger.info("Configuration recommendations:")
+                for rec in startup_result.recommendations:
+                    logger.info(f"  - {rec}")
+
+        # Step 2: Setup logging with validated configuration
+        logger.info("Setting up logging system...")
+        setup_logging(app_settings.logging)
         logger = get_logger("synhome_app")
-        setup_logging(
-            console_output=True,
-            file_path="logs/app.log",
-            log_level="DEBUG" if app_settings.debug else "INFO"
-        )
         logger.info("Logging system initialized")
 
-        # Initialize device manager
+        # Step 3: Initialize device manager
+        logger.info("Initializing device manager...")
         device_manager = DeviceManager()
 
-        # Load devices from configuration
-        if hasattr(app_settings, 'devices') and app_settings.devices:
-            devices_config = [device.model_dump() for device in app_settings.devices]
-            device_manager.load_devices_from_config(devices_config)
-            logger.info(f"Loaded {len(device_manager.get_all_devices())} devices")
+        # Step 4: Load devices from configuration
+        logger.info("Loading devices from configuration...")
+        try:
+            # Convert new device config format to legacy format for device manager
+            devices_config = []
+            if hasattr(app_settings, 'devices'):
+                for device in app_settings.devices:
+                    device_dict = device.model_dump()
+                    devices_config.append(device_dict)
 
-        # Configure LLM control if enabled
-        if (app_settings.zhipuai.enabled and
-            app_settings.zhipuai.api_key and
-            app_settings.zhipuai.api_key.strip()):
+            if devices_config:
+                device_manager.load_devices_from_config(devices_config)
+                logger.info(f"Loaded {len(device_manager.get_all_devices())} devices")
+            else:
+                logger.warning("No devices found in configuration")
+
+        except Exception as e:
+            logger.error(f"Failed to load devices: {e}")
+            if app_settings.environment.value == "production":
+                raise
+            else:
+                logger.warning("Continuing without devices in development mode")
+
+        # Step 5: Configure LLM control if enabled
+        if app_settings.zhipuai.enabled and app_settings.zhipuai.api_key:
             try:
                 device_manager.enable_llm_control(app_settings.zhipuai.api_key)
                 logger.info("LLM control enabled with ZhipuAI")
             except Exception as e:
-                logger.warning(f"Failed to enable LLM control: {e}")
+                logger.error(f"Failed to enable LLM control: {e}")
+                if app_settings.environment.value == "production":
+                    raise
+                else:
+                    logger.warning("Continuing without LLM control in development mode")
 
-        # Store settings in app state
+        # Step 6: Store settings in app state for API access
         app.state.app_settings = app_settings
         app.state.device_manager = device_manager
 
-        logger.info(f"SynHome application started successfully")
+        # Step 7: Perform health check
+        validation_service = get_validation_service()
+        health_result = validation_service.perform_health_check(app_settings)
+
+        if health_result.is_valid:
+            logger.info("Application health check passed")
+        else:
+            logger.warning(f"Health check warnings: {health_result.warnings}")
+
+        logger.info(f"SynHome application started successfully on {app_settings.host}:{app_settings.port}")
         logger.info(f"Environment: {app_settings.environment.value}")
         logger.info(f"Debug mode: {app_settings.debug}")
 
@@ -96,17 +152,20 @@ async def lifespan(app: FastAPI):
         raise
 
     finally:
-        # Simple cleanup
+        # Cleanup on shutdown
         logger.info("Shutting down SynHome application...")
+
         if device_manager:
             try:
+                # Disconnect all adapters
                 if hasattr(device_manager, "adapters"):
                     for adapter_id, adapter in device_manager.adapters.items():
                         logger.info(f"Disconnecting adapter: {adapter_id}")
                         await adapter.disconnect()
-                logger.info("All adapters disconnected")
+                    logger.info("All adapters disconnected")
             except Exception as e:
                 logger.error(f"Error during adapter cleanup: {e}")
+
         logger.info("SynHome application shutdown complete")
 
 # Initialize FastAPI app with lifespan

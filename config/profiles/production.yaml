@@ -1,0 +1,43 @@
+# Production Environment Configuration
+# Extends base.yaml with production-specific settings
+
+environment: production
+debug: false
+
+logging:
+  level: "INFO"
+  serialize: true
+  file_path: "/var/log/synhome/app.log"
+
+# Production-specific feature flags
+features:
+  enhanced_logging: true
+  debug_mode: false
+  metrics_collection: true
+  security_logging: true
+  performance_monitoring: true
+
+# Production logging (structured for monitoring)
+logging:
+  level: "INFO"
+  serialize: true
+  console_output: false
+  file_path: "/var/log/synhome/app.log"
+  max_size: "500 MB"
+  retention: "90 days"
+
+# Production-specific configuration
+hot_reload:
+  enabled: false
+
+# Production security settings
+security:
+  validate_all_configs: true
+  strict_validation: true
+  audit_logging: true
+
+# Performance settings
+performance:
+  cache_enabled: true
+  connection_pooling: true
+  async_operations: true

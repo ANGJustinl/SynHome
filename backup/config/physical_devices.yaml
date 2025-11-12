@@ -1,0 +1,89 @@
+# Physical devices configuration examples
+
+devices:
+  # Serial connected smart lamp example
+  - id: "serial_lamp"
+    name: "Serial Smart Lamp"
+    type: "light"
+    connection:
+      type: "serial"
+      port: "COM3"  # Windows example, use /dev/ttyUSB0 for Linux
+      baudrate: 9600
+      protocol: "text"  # Use text protocol for simple communication
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - brightness:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"
+
+  # GPIO connected relay example
+  - id: "gpio_socket"
+    name: "GPIO Smart Socket"
+    type: "socket"
+    connection:
+      type: "gpio"
+      pins:
+        power: 18  # GPIO pin number for power control
+      pwm_frequency: 1000  # For PWM capable pins
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+
+  # Modbus connected thermostat example
+  - id: "modbus_thermostat"
+    name: "Modbus Thermostat"
+    type: "thermostat"
+    connection:
+      type: "modbus"
+      mode: "tcp"  # or "rtu" for serial Modbus
+      host: "192.168.1.100"
+      port: 502
+      registers:
+        power:
+          address: 1000
+          type: "coil"
+        temperature:
+          address: 2000
+          type: "holding"
+          scale: 10  # Multiply by 10 for fixed-point numbers
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - temperature:
+          type: "number"
+          min: 16
+          max: 30
+          unit: "°C"
+
+  # Zigbee connected device example
+  - id: "zigbee_light"
+    name: "Zigbee Smart Light"
+    type: "light"
+    connection:
+      type: "zigbee"
+      port: "COM4"  # ZigBee coordinator port
+      endpoints:
+        power:
+          endpoint: 1
+          cluster: 6  # ON_OFF cluster
+          attribute: 0  # ON_OFF attribute
+        brightness:
+          endpoint: 1
+          cluster: 8  # LEVEL_CONTROL cluster
+          attribute: 0  # CURRENT_LEVEL attribute
+          scale: 2.55  # Scale 0-100 to 0-255
+    capabilities:
+      - power:
+          type: "switch"
+          states: ["off", "on"]
+      - brightness:
+          type: "number"
+          min: 0
+          max: 100
+          unit: "%"

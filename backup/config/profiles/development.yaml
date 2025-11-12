@@ -1,0 +1,31 @@
+# Development Environment Configuration
+# Extends base.yaml with development-specific settings
+
+environment: development
+debug: true
+
+logging:
+  level: "DEBUG"
+  serialize: false
+
+# Development-specific feature flags
+features:
+  enhanced_logging: true
+  debug_mode: true
+  mock_external_services: true
+  hot_reload: true
+
+# Development logging (more verbose)
+logging:
+  level: "DEBUG"
+  format: "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line}:{thread} | {message}"
+  console_output: true
+
+# Development-specific timeouts
+hot_reload:
+  enabled: true
+  debounce_seconds: 0.5
+
+# Development overrides
+debug_endpoints: true
+auto_reload: true
